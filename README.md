@@ -10,26 +10,25 @@ CosmoStat website for more information.
 
 Glimpse depends on the following software:
 
-    - **FFTW** version 3.3 or later
-    - **NFFT** version 3.2 or later
-    - **cfitsio** and **CCFits**
-    - **GSL**
-    - **CMake** version 2.8 or later
+* **FFTW** version 3.3 or later
+* **NFFT** version 3.2 or later
+* **cfitsio** and **CCFits**
+* **GSL**
+* **CMake** version 2.8 or later
 
 These dependencies can easily be installed using a package manager:
 
-    - Setting up requirements on **Linux**:
-        Simply use the package manager provided by your Linux distribution, for instance on Ubuntu Linux:
+* Setting up requirements on **Linux**:
+  Simply use the package manager provided by your Linux distribution, for instance on Ubuntu Linux:
 
-            $ sudo apt-get install cmake libgsl0-dev libfftw3-3  libccfits-dev libnfft3-dev
+    $ sudo apt-get install cmake libgsl0-dev libfftw3-3  libccfits-dev libnfft3-dev
 
-    - Setting up requirements on **MacOs X**:
-        The preferred installation method for the dependencies is through
-        [MacPorts](https://www.macports.org):
-
-            $ sudo port install cmake libgsl0-dev pkgconfig gsl fftw-3 nfft-3
-
-        CCFits needs to be installed manually, the sources can be found [here](http://heasarc.gsfc.nasa.gov/fitsio/ccfits/).
+* Setting up requirements on **MacOs X**:
+  The preferred installation method for the dependencies is through [MacPorts](https://www.macports.org):
+    
+    $ sudo port install cmake libgsl0-dev pkgconfig gsl fftw-3 nfft-3
+  
+  CCFits needs to be installed manually, the sources can be found [here](http://heasarc.gsfc.nasa.gov/fitsio/ccfits/).
 
 ### Compilation
 
