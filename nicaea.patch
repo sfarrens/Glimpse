@@ -1,0 +1,670 @@
+diff -Nbaur nicaea_2.5.orig/Cosmo/include/cmb_bao.h nicaea_2.5/Cosmo/include/cmb_bao.h
+--- nicaea_2.5.orig/Cosmo/include/cmb_bao.h	2012-01-06 10:19:08.000000000 -0500
++++ nicaea_2.5/Cosmo/include/cmb_bao.h	2016-03-03 21:50:13.016630494 -0500
+@@ -6,6 +6,10 @@
+ #ifndef __CMB_BAO_H
+ #define __CMB_BAO_H
+ 
++#ifdef __cplusplus
++extern "C" {
++#endif
++
+ 
+ #include <stdio.h>
+ #include <stdlib.h>
+@@ -18,6 +22,9 @@
+ #include "maths.h"
+ #include "mvdens.h"
+ 
++#ifdef __cplusplus
++namespace nicaea {
++#endif
+ 
+ double z_star(cosmo *self);
+ double acoustic_scale(cosmo *self, error **err);
+@@ -31,5 +38,8 @@
+ double chi2_bao_d_z(cosmo *model, mvdens *g, const double *z_BAO, error **err);
+ double chi2_bao_D_V_ratio(cosmo *model, mvdens *g, const double *z_BAO, error **err);
+ 
++#ifdef __cplusplus
++}}
++#endif
+ 
+ #endif
+diff -Nbaur nicaea_2.5.orig/Cosmo/include/cosmo.h nicaea_2.5/Cosmo/include/cosmo.h
+--- nicaea_2.5.orig/Cosmo/include/cosmo.h	2014-06-27 10:16:39.000000000 -0400
++++ nicaea_2.5/Cosmo/include/cosmo.h	2016-03-03 21:51:48.368064448 -0500
+@@ -6,6 +6,9 @@
+ #ifndef __COSMO_H
+ #define __COSMO_H
+ 
++#ifdef __cplusplus
++extern "C" {
++#endif
+ 
+ #include <math.h>
+ #include <stdlib.h>
+@@ -19,6 +22,10 @@
+ #include "config.h"
+ #include "coyote.h"
+ 
++#ifdef __cplusplus
++namespace nicaea {
++#endif
++    
+ 
+ /* If fastxi is defined, the integration over comoving distances for the lensing *
+  * power spectrum P_kappa done without the need of interpolating P_NL.  	 */
+@@ -341,4 +348,8 @@
+ CHANGE(w_de);
+ #undef CHANGE
+ 
++#ifdef __cplusplus
++}}
++#endif
++
+ #endif /* __COSMO_H */
+diff -Nbaur nicaea_2.5.orig/Cosmo/include/decomp_eb.h nicaea_2.5/Cosmo/include/decomp_eb.h
+--- nicaea_2.5.orig/Cosmo/include/decomp_eb.h	2013-05-17 10:51:37.000000000 -0400
++++ nicaea_2.5/Cosmo/include/decomp_eb.h	2016-03-03 21:53:05.442550887 -0500
+@@ -7,6 +7,10 @@
+ #ifndef __DECOMP_EB_H
+ #define __DECOMP_EB_H
+ 
++#ifdef __cplusplus
++extern "C" {
++#endif
++
+ 
+ #include <stdio.h>
+ #include <math.h>
+@@ -35,6 +39,11 @@
+ #define NMAX_COSEBI     20
+ 
+ 
++#ifdef __cplusplus
++namespace nicaea {
++#endif
++
++
+ typedef enum {cheby, cheby2, legen, cosebi} poly_t;
+ #define spoly_t(i) ( \
+   i==cheby  ? "cheby" : \
+@@ -105,5 +114,8 @@
+ void xipmEB(double theta, double THETA_MIN, double THETA_MAX, const double *c, 
+ 	    const double *E, const double *B, int N, double xi_pm_EB[4], error **err);
+ 
++#ifdef __cplusplus
++}}
++#endif
+ 
+ #endif
+diff -Nbaur nicaea_2.5.orig/Cosmo/include/lensing_3rd.h nicaea_2.5/Cosmo/include/lensing_3rd.h
+--- nicaea_2.5.orig/Cosmo/include/lensing_3rd.h	2013-08-20 08:27:51.000000000 -0400
++++ nicaea_2.5/Cosmo/include/lensing_3rd.h	2016-03-03 21:56:46.009222551 -0500
+@@ -6,6 +6,10 @@
+ #ifndef __LENSING_3RD_H
+ #define __LENSING_3RD_H
+ 
++#ifdef __cplusplus
++extern "C" {
++#endif
++
+ #include <math.h>
+ #include <stdlib.h>
+ #include <stdio.h>
+@@ -47,6 +51,10 @@
+ #define lensing_3rd_rootbracket  -4 + lensing_3rd_base
+ #define lensing_3rd_slc          -5 + lensing_3rd_base
+ 
++#ifdef __cplusplus
++namespace nicaea {
++#endif
++
+ typedef enum {fgauss=0, fpoly=1, ftophat=2, fdelta=3, fxip=4, fxim=5, fall=6} filter_t;
+ 
+ typedef enum {PT=0, SCOCOU=1, GM12} bispmode_t;
+@@ -221,7 +229,8 @@
+ 			int Ntheta, double *theta, error **err);
+ double chi2_lensing_3rd(cosmo_3rd *self, datcov *dc, const cosebi_info_t *cosebi_info, error **err);
+ 
+-
+-
++#ifdef __cplusplus
++}}
+ #endif
+ 
++#endif
+diff -Nbaur nicaea_2.5.orig/Cosmo/include/lensing.h nicaea_2.5/Cosmo/include/lensing.h
+--- nicaea_2.5.orig/Cosmo/include/lensing.h	2013-08-20 05:51:36.000000000 -0400
++++ nicaea_2.5/Cosmo/include/lensing.h	2016-03-03 21:57:21.639256046 -0500
+@@ -7,6 +7,10 @@
+ #ifndef __LENSING_H
+ #define __LENSING_H
+ 
++#ifdef __cplusplus
++extern "C" {
++#endif
++
+ #include <math.h>
+ #include <stdlib.h>
+ #include <stdio.h>
+@@ -33,6 +37,10 @@
+ #include "reduced_fit.h"
+ 
+ 
++#ifdef __cplusplus
++namespace nicaea {
++#endif
++
+ /* Dimensions of interpolation tables */
+ /* N_s was increased from 200 to 400, for linear tabulation of P_kappa */
+ #define N_s     400
+@@ -378,6 +386,8 @@
+ CHANGE(map2);
+ #undef CHANGE
+ 
++#ifdef __cplusplus
++}}
++#endif
+ 
+ #endif /* __LENSING_H */
+-
+diff -Nbaur nicaea_2.5.orig/Cosmo/include/nofz.h nicaea_2.5/Cosmo/include/nofz.h
+--- nicaea_2.5.orig/Cosmo/include/nofz.h	2013-08-20 05:48:51.000000000 -0400
++++ nicaea_2.5/Cosmo/include/nofz.h	2016-03-03 22:00:32.279826719 -0500
+@@ -6,6 +6,10 @@
+ #ifndef __NOFZ_H
+ #define __NOFZ_H
+ 
++#ifdef __cplusplus
++extern "C" {
++#endif
++
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <stdarg.h>
+@@ -30,6 +34,10 @@
+ /* Very narrow redshift bins cause a bug in the shear correlation function */
+ #define MINIMUM_ZBIN_WIDTH 0.1
+ 
++#ifdef __cplusplus
++namespace nicaea {
++#endif
++
+ /* Distribution types and functions */
+ typedef enum {ludo, jonben, ymmk, ymmk0const, hist, single} nofz_t;
+ #define snofz_t(i) ( \
+@@ -105,5 +113,9 @@
+ 
+ int change_zmean(redshift_t *, redshift_t *, error **err);
+ 
++#ifdef __cplusplus
++}}
++#endif
++
+ 
+ #endif
+diff -Nbaur nicaea_2.5.orig/Cosmo/include/reduced_fit.h nicaea_2.5/Cosmo/include/reduced_fit.h
+--- nicaea_2.5.orig/Cosmo/include/reduced_fit.h	2012-01-06 10:19:08.000000000 -0500
++++ nicaea_2.5/Cosmo/include/reduced_fit.h	2016-03-03 22:01:29.966774199 -0500
+@@ -1,6 +1,9 @@
+ #ifndef __REDUCED_FIT_H
+ #define __REDUCED_FIT_H
+ 
++#ifdef __cplusplus
++extern "C" {
++#endif
+ 
+ #include <stdio.h>
+ #include <stdlib.h>
+@@ -21,6 +24,9 @@
+ #define N_B    4
+ #define N_C    4
+ 
++#ifdef __cplusplus
++namespace nicaea {
++#endif
+ 
+ extern const double B_fit[M_PAR][N_PL][N_B];
+ extern const double C_fit[M_PAR][N_POLY][N_C];
+@@ -46,5 +52,8 @@
+ 		     const double dpar[M_PAR]);
+ int check_limits(const double dpar[M_PAR]);
+ 
++#ifdef __cplusplus
++}}
++#endif
+ 
+ #endif
+diff -Nbaur nicaea_2.5.orig/Cosmo/include/sn1a.h nicaea_2.5/Cosmo/include/sn1a.h
+--- nicaea_2.5.orig/Cosmo/include/sn1a.h	2012-01-06 10:19:08.000000000 -0500
++++ nicaea_2.5/Cosmo/include/sn1a.h	2016-03-03 22:01:52.346894428 -0500
+@@ -6,6 +6,9 @@
+ #ifndef __SN1A_H
+ #define __SN1A_H
+ 
++#ifdef __cplusplus
++extern "C" {
++#endif
+ 
+ #include <stdio.h>
+ #include <stdlib.h>
+@@ -26,6 +29,10 @@
+ //#define NLCP 3
+ #define NLCP 4
+ 
++#ifdef __cplusplus
++namespace nicaea {
++#endif
++
+ /* Chi^2 methods */
+ typedef enum {chi2_simple, chi2_Theta2_denom_fixed, chi2_no_sc, chi2_betaz, chi2_dust, chi2_residual} chi2mode_t;
+ #define schi2mode_t(i) ( \
+@@ -129,4 +136,8 @@
+ 
+ double distance_module(cosmo *self, double dlum, error **err);
+ 
++#ifdef __cplusplus
++}}
++#endif
++
+ #endif /* __SN1A_H */
+diff -Nbaur nicaea_2.5.orig/Coyote/include/constants.h nicaea_2.5/Coyote/include/constants.h
+--- nicaea_2.5.orig/Coyote/include/constants.h	2013-05-31 05:23:17.000000000 -0400
++++ nicaea_2.5/Coyote/include/constants.h	2016-03-03 21:51:22.584344226 -0500
+@@ -11,6 +11,14 @@
+ #define peta 5
+ #define rs   6
+ 
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#ifdef __cplusplus
++namespace nicaea {
++#endif
++
+ const double kemu[1000];
+ const double mean[neta];
+ const double K[neta][peta];
+@@ -21,3 +29,6 @@
+ const double KrigBasis[peta][m];
+ 
+ /* The above defined quantities are undefined at the end of emu.c */
++#ifdef __cplusplus
++}}
++#endif
+diff -Nbaur nicaea_2.5.orig/Coyote/include/coyote.h nicaea_2.5/Coyote/include/coyote.h
+--- nicaea_2.5.orig/Coyote/include/coyote.h	2013-05-31 05:36:15.000000000 -0400
++++ nicaea_2.5/Coyote/include/coyote.h	2016-03-03 21:52:29.795351513 -0500
+@@ -1,8 +1,9 @@
+ #ifndef __COYOTE_H
+ #define __COYOTE_H
+ 
+-
+-
++#ifdef __cplusplus
++extern "C" {
++#endif
+ 
+ #include <stdio.h>
+ #include <math.h>
+@@ -19,6 +20,10 @@
+ #include "maths.h"
+ 
+ 
++#ifdef __cplusplus
++namespace nicaea {
++#endif
++
+ /* Error codes */
+ #define coyote_base -2200
+ #define coyote_h        -1 + coyote_base
+@@ -63,4 +68,8 @@
+                       double xstar[]);
+ 
+ 
++#ifdef __cplusplus
++}}
++#endif
++
+ #endif
+diff -Nbaur nicaea_2.5.orig/Coyote/include/fr_constants.h nicaea_2.5/Coyote/include/fr_constants.h
+--- nicaea_2.5.orig/Coyote/include/fr_constants.h	2013-05-31 05:28:31.000000000 -0400
++++ nicaea_2.5/Coyote/include/fr_constants.h	2016-03-03 21:54:06.302769433 -0500
+@@ -3,6 +3,9 @@
+  * Martin Kilbinger 2013			   	*
+  * Constants from .h files in FrankenEmu.           	*
+  * ==================================================== */
++#ifdef __cplusplus
++extern "C" {
++#endif
+ 
+ #include "coyote.h"
+ 
+@@ -18,6 +21,9 @@
+ /* neta_over_rs = neta / rs */
+ # define neta_over_rs 500
+ 
++#ifdef __cplusplus
++namespace nicaea {
++#endif
+ 
+ const double fr_kemu[neta_over_rs]; /* MKDEBUG: Size was 1000 in original Coyote emulator, for some reason */
+ const double fr_mean[neta];
+@@ -31,4 +37,6 @@
+ const double fr_KrigBasis[peta][m];
+ 
+ /* The above defined quantities are undefined at the end of emu.c */
+-
++#ifdef __cplusplus
++}}
++#endif
+diff -Nbaur nicaea_2.5.orig/halomodel/include/halomodel.h nicaea_2.5/halomodel/include/halomodel.h
+--- nicaea_2.5.orig/halomodel/include/halomodel.h	2014-09-13 10:44:11.000000000 -0400
++++ nicaea_2.5/halomodel/include/halomodel.h	2016-03-03 21:54:46.205987822 -0500
+@@ -6,6 +6,10 @@
+ #ifndef __HALOMODEL_H
+ #define __HALOMODEL_H
+ 
++#ifdef __cplusplus
++extern "C" {
++#endif
++
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <math.h>
+@@ -24,6 +28,10 @@
+ #include "cosmo.h"
+ #include "nofz.h"
+ 
++#ifdef __cplusplus
++namespace nicaea {
++#endif
++
+ #define hm_base     -1900
+ #define hm_hodtype   hm_base + 1
+ #define hm_Mmin      hm_base + 2
+@@ -321,6 +329,8 @@
+ 
+ #undef CHANGE
+ 
+-
++#ifdef __cplusplus
++}}
+ #endif
+ 
++#endif
+diff -Nbaur nicaea_2.5.orig/halomodel/include/hod.h nicaea_2.5/halomodel/include/hod.h
+--- nicaea_2.5.orig/halomodel/include/hod.h	2014-09-13 10:44:11.000000000 -0400
++++ nicaea_2.5/halomodel/include/hod.h	2016-03-03 21:55:26.969248261 -0500
+@@ -6,6 +6,10 @@
+ #ifndef __HOD_H
+ #define __HOD_H
+ 
++#ifdef __cplusplus
++extern "C" {
++#endif
++
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <math.h>
+@@ -69,6 +73,10 @@
+ #define getCharValue(array,col)    array+NCHAR*(col-1)
+ #define getLine(array,i)           array+NFIELD*NCHAR*i
+ 
++#ifdef __cplusplus
++namespace nicaea {
++#endif
++
+ #define Nhalodata_t 4
+ typedef enum {w_of_theta, wp_rp, deltaSigma, smf} halodata_t; 
+ #define shalodata_t(i) ( \
+@@ -327,5 +335,8 @@
+ double compute_chisq_wp(cosmo_hm *model, const wt_t *wth, double ngd_obs, double ngd_err,
+ 			ngal_fit_t ngal_fit_type, double *ngd, int dologw, error **err);
+ 
++#ifdef __cplusplus
++}}
++#endif
+ 
+ #endif
+diff -Nbaur nicaea_2.5.orig/tools/include/config.h nicaea_2.5/tools/include/config.h
+--- nicaea_2.5.orig/tools/include/config.h	2014-10-20 05:32:43.000000000 -0400
++++ nicaea_2.5/tools/include/config.h	2016-03-03 21:51:03.000000000 -0500
+@@ -6,6 +6,10 @@
+ #ifndef __CONFIG_H
+ #define __CONFIG_H
+ 
++#ifdef __cplusplus
++extern "C" {
++#endif
++
+ #include <stdio.h>
+ #include <string.h>
+ #include <assert.h>
+@@ -24,6 +28,9 @@
+ /* Maximal length of a short string config entry */
+ #define CSLENS 1024
+ 
++#ifdef __cplusplus
++namespace nicaea {
++#endif
+ 
+ typedef enum {c_i, c_d, c_s} config_element_t;
+ #define sconfig_element_t(i) ( \
+@@ -109,6 +116,8 @@
+ 		 "String \"%s\" expected but \"%s\" found instead in config file", *err, __LINE__,, str, stmp);
+ 
+ 
+-
++#ifdef __cplusplus
++}}
+ #endif
+ 
++#endif
+diff -Nbaur nicaea_2.5.orig/tools/include/errorlist.h nicaea_2.5/tools/include/errorlist.h
+--- nicaea_2.5.orig/tools/include/errorlist.h	2012-01-06 10:19:08.000000000 -0500
++++ nicaea_2.5/tools/include/errorlist.h	2016-03-03 21:53:35.000000000 -0500
+@@ -10,6 +10,9 @@
+ #ifndef __ERRORLIST_H
+ #define __ERRORLIST_H
+ 
++#ifdef __cplusplus
++extern "C" {
++#endif
+ 
+ #include <stdio.h>
+ #include <stdlib.h>
+@@ -21,6 +24,10 @@
+ #define WHR_SZ 2048
+ #define TOT_SZ TXT_SZ+WHR_SZ
+ 
++#ifdef __cplusplus
++namespace nicaea {
++#endif
++
+ typedef struct _err {
+ 	char errWhere[WHR_SZ];
+ 	char errText[TXT_SZ];
+@@ -147,4 +154,10 @@
+ error* initError(void);
+ void endError(error **err);
+ int _isError(error *err);
++
++#ifdef __cplusplus
++}}
++#endif
++
++
+ #endif
+diff -Nbaur nicaea_2.5.orig/tools/include/io.h nicaea_2.5/tools/include/io.h
+--- nicaea_2.5.orig/tools/include/io.h	2013-09-26 05:25:53.000000000 -0400
++++ nicaea_2.5/tools/include/io.h	2016-03-03 21:56:03.000000000 -0500
+@@ -6,6 +6,10 @@
+ #ifndef __IO_H
+ #define __IO_H
+ 
++#ifdef __cplusplus
++extern "C" {
++#endif
++
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <ctype.h>
+@@ -29,7 +33,9 @@
+ #define io_inconsistent -5 + io_base
+ #define io_directory    -6 + io_base
+ 
+-
++#ifdef __cplusplus
++namespace nicaea {
++#endif
+ 
+ unsigned int numberoflines(const char *, error **err);
+ unsigned int numberoflines_comments(const char *name, unsigned int *ncomment, error **err);
+@@ -74,4 +80,8 @@
+ void end_time(time_t t_start, FILE *FOUT);
+ void end_clock(clock_t c_start, FILE *FOUT);
+ 
++#ifdef __cplusplus
++}}
++#endif
++
+ #endif
+diff -Nbaur nicaea_2.5.orig/tools/include/maths_base.h nicaea_2.5/tools/include/maths_base.h
+--- nicaea_2.5.orig/tools/include/maths_base.h	2012-01-06 10:19:08.000000000 -0500
++++ nicaea_2.5/tools/include/maths_base.h	2016-03-03 21:57:48.000000000 -0500
+@@ -10,6 +10,10 @@
+ #ifndef __MATHS_BASE_H
+ #define __MATHS_BASE_H
+ 
++#ifdef __cplusplus
++extern "C" {
++#endif
++
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <math.h>
+@@ -43,6 +47,10 @@
+ #define math_overflow	        -12 + math_base
+ #define math_unknown            -13 + math_base
+ 
++#ifdef __cplusplus
++namespace nicaea {
++#endif
++
+ 
+ typedef double my_complex[2];
+ 
+@@ -72,6 +80,8 @@
+ /* Scalar product (x,y) */
+ #define SP(x,y) ((x)[0]*(y)[0]+(x)[1]*(y)[1])
+ 
+-
++#ifdef __cplusplus
++}}
+ #endif
+ 
++#endif
+diff -Nbaur nicaea_2.5.orig/tools/include/maths.h nicaea_2.5/tools/include/maths.h
+--- nicaea_2.5.orig/tools/include/maths.h	2013-01-22 10:38:43.000000000 -0500
++++ nicaea_2.5/tools/include/maths.h	2016-03-03 21:59:25.000000000 -0500
+@@ -6,6 +6,10 @@
+ #ifndef __MATHS_H
+ #define __MATHS_H
+ 
++#ifdef __cplusplus
++extern "C" {
++#endif
++
+ #ifndef _NOFFTW_
+ #include <fftw3.h>
+ #endif
+@@ -23,6 +27,10 @@
+ #define NR_END 1
+ #define FREE_ARG char*
+ 
++#ifdef __cplusplus
++namespace nicaea {
++#endif
++
+ /* See cosmo.h */
+ typedef enum {comp_c=0, comp_b=1, comp_nu=2} comp_t;
+ #define NCOMP 3
+@@ -230,4 +238,8 @@
+ void hankel_kernel_tophat(double k, fftw_complex *res, error **err);
+ #endif
+ 
++#ifdef __cplusplus
++}}
++#endif
++
+ #endif
+diff -Nbaur nicaea_2.5.orig/tools/include/mvdens.h nicaea_2.5/tools/include/mvdens.h
+--- nicaea_2.5.orig/tools/include/mvdens.h	2012-03-07 03:33:06.000000000 -0500
++++ nicaea_2.5/tools/include/mvdens.h	2016-03-03 22:00:00.000000000 -0500
+@@ -23,6 +23,10 @@
+ 
+ #endif
+ 
++#ifdef __cplusplus
++extern "C" {
++#endif
++
+ #include <stdlib.h>
+ #include <stdio.h>
+ #include <string.h>
+@@ -47,6 +51,9 @@
+ #endif
+ #endif
+ 
++#ifdef __cplusplus
++namespace nicaea {
++#endif
+ 
+ #define __MVDENS_PARANOID_DEBUG__
+ 
+@@ -173,5 +180,8 @@
+ mix_mvdens* mix_mvdens_hdfdwnp(char *fname,error **err);
+ #endif
+ 
++#ifdef __cplusplus
++}}
+ #endif
+ 
++#endif
+diff -Nbaur nicaea_2.5.orig/tools/include/par.h nicaea_2.5/tools/include/par.h
+--- nicaea_2.5.orig/tools/include/par.h	2014-09-13 10:44:10.000000000 -0400
++++ nicaea_2.5/tools/include/par.h	2016-03-03 22:00:59.000000000 -0500
+@@ -1,12 +1,20 @@
+ #ifndef __PAR_H
+ #define __PAR_H
+ 
++#ifdef __cplusplus
++extern "C" {
++#endif
++
+ #include <stdio.h>
+ 
+ #include "errorlist.h"
+ #include "io.h"
+ #include "config.h"
+ 
++#ifdef __cplusplus
++namespace nicaea {
++#endif
++
+ /* Parameters */
+ typedef enum {
+   p_Omegam, p_Omegab, p_Omegade, p_h100, p_Omeganumass,
+@@ -145,4 +153,8 @@
+ void spar_to_par(par_t **par, int npar, const char *spar[], error **err);
+ 
+ 
++#ifdef __cplusplus
++}}
++#endif
++
+ #endif
