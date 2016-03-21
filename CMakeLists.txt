@@ -70,7 +70,7 @@ set(GLIMPSE_SRC src/survey.cpp
 		src/wavelet_transform.cpp)
 
 if(APPLE)
-  set(CMAKE_CXX_FLAGS "-DMACOS -O3 -fpermissive -fopenmp")
+  set(CMAKE_CXX_FLAGS "-DMACOS -O3 -fpermissive")
   set(CMAKE_C_FLAGS "-O3 -fpermissive")
 else(APPLE)
   set(CMAKE_CXX_FLAGS "-O3 -fpermissive -fopenmp")
