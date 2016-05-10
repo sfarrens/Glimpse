@@ -193,7 +193,7 @@ field::field(boost::property_tree::ptree config, survey *su)
     if (nlp == 1) {
         
         // If the lens redshift wasn't provided, use unit weights
-        if(zlens < 0){
+        if(zlens <= 0){
             for(long ind =0; ind < ngal*nlp; ind++){lensKernel[ind] = 1. ;}
         }else{
             // In the 2D case, the lensing kernel is just a lensing weight based on the
