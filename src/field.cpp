@@ -64,7 +64,10 @@ field::field(boost::property_tree::ptree config, survey *su)
     // Load  the  redshift range of the reconstruction
     nlp   = config.get<double>("field.nlp",    1);
     if (nlp == 1) {
-        zlens = config.get<double>("field.zlens");
+        zlens = config.get<double>("field.zlens", -1);
+        if(zlens <= 0){
+            std::cout << "Warning: No redshift specified for the lens, ignoring source redsfhits" << std::endl;
+        }
     } else {
         zlp_low.resize(nlp);
         zlp_up.resize(nlp);
@@ -188,9 +191,15 @@ field::field(boost::property_tree::ptree config, survey *su)
     // Initialize the lensing kernel for each galaxy
     lensKernel = (double *) malloc(sizeof(double) * ngal * nlp);
     if (nlp == 1) {
-        // In the 2D case, the lensing kernel is just a lensing weight based on the
-        // critical surface mass density.
-        compute_surface_lensing_kernel();
+        
+        // If the lens redshift wasn't provided, use unit weights
+        if(zlens <= 0){
+            for(long ind =0; ind < ngal*nlp; ind++){lensKernel[ind] = 1. ;}
+        }else{
+            // In the 2D case, the lensing kernel is just a lensing weight based on the
+            // critical surface mass density.
+            compute_surface_lensing_kernel();
+        }
     } else {
         // Compute the full 3D lensing kernel, to reconstruct the 3D density contrast
         compute_3D_lensing_kernel();
