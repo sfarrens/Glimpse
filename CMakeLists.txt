@@ -22,7 +22,13 @@ find_package(GSL    REQUIRED)
 find_package(CCFits REQUIRED)
 find_package(FFTW   REQUIRED)
 find_package(NFFT   REQUIRED)
-find_package(Boost  COMPONENTS program_options REQUIRED)
+
+# Build boost manually on Mac OS X systems otherwise just use the system version
+if(APPLE)
+	include(BuildBoost)
+else(APPLE)
+	find_package(Boost  COMPONENTS program_options REQUIRED)
+endif(APPLE)
 
 # Include external projects
 ## NICAEA
