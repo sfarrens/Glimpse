@@ -92,7 +92,6 @@ survey::~survey()
 void survey::load(string fileName)
 {
     std::vector<string> hdus;
-    std::map<string, Column *> cols;
     std::valarray < double > ra, dec, e1, e2, f1, f2, w_e, w_f;
     std::valarray < double > z, zsig, zsig_min, zsig_max, mag;
     std::vector< std::valarray < double > > pz;
@@ -107,41 +106,44 @@ void survey::load(string fileName)
     ExtHDU &table = pInfile->extension(hdu_number);
 
     // Identify the type of data contained in this HDU
-    cols = table.column();
-
+    
     // Check coordinates
-    if (cols.find(column_map[RA]) == cols.end() || cols.find(column_map[DEC]) == cols.end()) {
+    if (table.column().find(column_map[RA]) == table.column().end() ||
+        table.column().find(column_map[DEC]) == table.column().end()) {
         std::cout << "Could not find the coordinates columns in data file" << std::endl;
         exit(-1);
     }
 
     // Check for ellipticity
-    if (cols.find(column_map[E1]) == cols.end() || cols.find(column_map[E2]) == cols.end()) {
+    if (table.column().find(column_map[E1]) == table.column().end() ||
+        table.column().find(column_map[E2]) == table.column().end()) {
         std::cout << "Could not find ellipticity measurements in data file" << std::endl;
         exit(-1);
     }
 
     // Check for flexion
-    if (cols.find(column_map[F1]) != cols.end() && cols.find(column_map[F2]) != cols.end()) {
+    if (table.column().find(column_map[F1]) != table.column().end() && 
+        table.column().find(column_map[F2]) != table.column().end()) {
         has_flexion = true;
 	flexion_available = true;
     }
 
     // Check for weights
-    if (cols.find(column_map[W_E]) != cols.end() || cols.find(column_map[W_F]) != cols.end()) {
+    if (table.column().find(column_map[W_E]) != table.column().end() ||
+        table.column().find(column_map[W_F]) != table.column().end()) {
         has_weights = true;
     }
 
     // Check for different redshift information
-    if (cols.find(column_map[PZ])             != cols.end()) {
+    if (table.column().find(column_map[PZ])             != table.column().end()) {
         ztype = DISTRIBUTION;
-    } else if (cols.find(column_map[Z])        != cols.end() &&
-               cols.find(column_map[ZSIG_MIN]) == cols.end() &&
-               cols.find(column_map[ZSIG_MAX]) == cols.end()) {
+    } else if (table.column().find(column_map[Z])        != table.column().end() &&
+               table.column().find(column_map[ZSIG_MIN]) == table.column().end() &&
+               table.column().find(column_map[ZSIG_MAX]) == table.column().end()) {
         ztype = DIRAC;
-    } else if (cols.find(column_map[Z])        != cols.end() &&
-               cols.find(column_map[ZSIG_MIN]) != cols.end() &&
-               cols.find(column_map[ZSIG_MAX]) != cols.end()) {
+    } else if (table.column().find(column_map[Z])        != table.column().end() &&
+               table.column().find(column_map[ZSIG_MIN]) != table.column().end() &&
+               table.column().find(column_map[ZSIG_MAX]) != table.column().end()) {
         ztype = GAUSSIAN;
     } else {
         std::cout << "Could not find redshift information in data file" << std::endl;
