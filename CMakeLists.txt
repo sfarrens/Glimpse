@@ -25,9 +25,9 @@ find_package(NFFT   REQUIRED)
 
 # Build boost manually on Mac OS X systems otherwise just use the system version
 if(APPLE)
-	include(BuildBoost)
+    include(BuildBoost)
 else(APPLE)
-	find_package(Boost  COMPONENTS program_options REQUIRED)
+    find_package(Boost COMPONENTS program_options REQUIRED)
 endif(APPLE)
 
 # Include external projects
@@ -76,7 +76,7 @@ set(GLIMPSE_SRC src/survey.cpp
 		src/wavelet_transform.cpp)
 
 if(APPLE)
-  set(CMAKE_CXX_FLAGS "-DMACOS -O3 -fpermissive")
+  set(CMAKE_CXX_FLAGS "-DMACOS -O3 -fpermissive -fopenmp")
   set(CMAKE_C_FLAGS "-O3 -fpermissive")
 else(APPLE)
   set(CMAKE_CXX_FLAGS "-O3 -fpermissive -fopenmp")
@@ -85,6 +85,10 @@ endif(APPLE)
   
 add_executable(glimpse src/glimpse.cpp ${GLIMPSE_SRC})
 add_dependencies(glimpse NICAEA SPARSE2D)
+if(APPLE)
+    add_dependencies(glimpse Boost)
+endif(APPLE)
+
 target_link_libraries(glimpse ${NICAEA_LIBRARIES}
 			      ${SPARSE2D_LIBRARIES}
 			      ${Boost_LIBRARIES} 
@@ -93,3 +97,5 @@ target_link_libraries(glimpse ${NICAEA_LIBRARIES}
 			      ${FFTW_LIBRARIES}
 			      ${CCFITS_LIBRARY}
 			      ${CFITSIO_LIBRARY})
+add_dependencies(glimpse Boost)
+
