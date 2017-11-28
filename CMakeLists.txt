@@ -42,7 +42,7 @@ ExternalProject_Add(SPARSE2D
         CMAKE_ARGS     -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/extern)
         set(SPARSE2D_LIBRARY_DIR ${CMAKE_BINARY_DIR}/extern/lib)
         set(SPARSE2D_INCLUDE_DIR ${CMAKE_BINARY_DIR}/extern/include)
-        set(SPARSE2D_LIBRARIES -lsparse2d)
+        set(SPARSE2D_LIBRARIES -lsparse2d -lsparse1d -ltools)
         
 include_directories(${SPARSE2D_INCLUDE_DIR}
 		    ${GSL_INCLUDE_DIR}
