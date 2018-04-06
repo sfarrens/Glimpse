@@ -1,4 +1,4 @@
- Glimpse
+# Glimpse
 
 Glimpse is a sparsity based mass-mapping algorithm. See the
 [Glimpse page](http://www.cosmostat.org/software/glimpse) on the
