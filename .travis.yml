@@ -3,18 +3,19 @@ language: cpp
 
 # Compiler selection
 compiler:
-  - gcc
+    - gcc
 
 sudo: required
 
 before_install:
-- sudo apt-get update -qq
-- sudo apt-get install -qq cmake libgsl0-dev libfftw3-3  libccfits-dev libnfft3-dev libarmadillo-dev
+    - sudo apt-get update -qq
+    - sudo apt-get install -qq cmake libgsl0-dev libfftw3-3  libccfits-dev libnfft3-dev libarmadillo-dev libboost-all-dev
+#- sudo apt-get install -qq nvidia-cuda-dev
 
 install: true
 
 # Build steps
 script:
-  - mkdir build && cd build
-  - cmake ..
-  - make
+    - mkdir build && cd build
+    - cmake ..
+    - make
