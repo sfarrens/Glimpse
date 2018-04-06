@@ -32,12 +32,25 @@
  *
  */
 
+#include "field.h"
+
 #include <iostream>
 #include <fstream>
 #include <string>
 #include <gsl/gsl_integration.h>
+#include <gsl/gsl_interp.h>
 
-#include "field.h"
+#ifdef DEBUG_FITS
+#include <sparse2d/IM_IO.h>
+#endif
+
+#define ZMAX 10.0
+
+#undef pi
+#undef sd
+
+
+#include <armadillo>
 
 field::field(boost::property_tree::ptree config, survey *su)
 {
@@ -78,19 +91,18 @@ field::field(boost::property_tree::ptree config, survey *su)
             zlp_low[i] = zlp_min + (zlp_max - zlp_min) * ((double) i) / ((double) nlp);
             zlp_up[i]  = zlp_min + (zlp_max - zlp_min) * ((double)(i + 1.0)) / ((double) nlp);
         }
-        //For the last bin we go up to 10
-        //TODO: Is it necessary ?
-        zlp_up[nlp - 1] = 10;
     }
+    
+    r_cond = config.get<double>("field.r_cond", 0.1);
 
     // Here we increase the size of the field to avoid border effects
-    double size       = surv->get_size();
     double center_ra  = surv->get_center_ra();
     double center_dec = surv->get_center_dec();
-    npix = size / pixel_size;
+    double survey_size = surv->get_size();
+    npix = survey_size / pixel_size;
     npix = npix + (npix % 2) + 2 * padding_size;
     size = npix * pixel_size;
-    std::cout << "Number of pixels : " << npix << "Pixel size : " << pixel_size << std::endl;
+    std::cout << "Number of pixels : " << npix << " Pixel size : " << pixel_size << std::endl;
 
     // Check whether flexion measurements are available
     include_flexion = config.get<bool>("field.include_flexion", false);
@@ -157,7 +169,7 @@ field::field(boost::property_tree::ptree config, survey *su)
 
     // Initialize the lensing planes, with one nfft per plane
     ps = (nfft_plan **) malloc((nlp) * sizeof(nfft_plan *));
-    fft_frame = fftw_alloc_complex(npix * npix * nlp);
+    fft_frame = fftwf_alloc_complex(npix * npix * nlp);
     
     // Normalization factor for the fft
     fftFactor =1.0/(((double)npix)*npix);
@@ -189,10 +201,13 @@ field::field(boost::property_tree::ptree config, survey *su)
     }
 
     // Initialize the lensing kernel for each galaxy
-    lensKernel = (double *) malloc(sizeof(double) * ngal * nlp);
+    lensKernel     = (double *) malloc(sizeof(double) * ngal * nlp);
+    lensKernelTrue = (double *) malloc(sizeof(double) * ngal * nlp);
+    P = (double *) malloc(sizeof(double) * nlp * nlp);
+    PP= (double *) malloc(sizeof(double) * nlp * nlp);
+    iP= (double *) malloc(sizeof(double) * nlp * nlp);
     if (nlp == 1) {
-        
-        // If the lens redshift wasn't provided, use unit weights
+         // If the lens redshift wasn't provided, use unit weights
         if(zlens <= 0){
             for(long ind =0; ind < ngal*nlp; ind++){lensKernel[ind] = 1. ;}
         }else{
@@ -200,9 +215,14 @@ field::field(boost::property_tree::ptree config, survey *su)
             // critical surface mass density.
             compute_surface_lensing_kernel();
         }
+        P[0] = 1.;
+        PP[0]= 1.;
+        iP[0]= 1.;
     } else {
+        std::cout << "Starting computation of lensing kernels" <<std::endl;
         // Compute the full 3D lensing kernel, to reconstruct the 3D density contrast
         compute_3D_lensing_kernel();
+        std::cout << "Done "<<std::endl;
     }
 
     // Compute the ratio of shear and flexion variance if necessary
@@ -227,8 +247,6 @@ field::field(boost::property_tree::ptree config, survey *su)
 
         sig_frac = flexion_sigma / shear_sigma;
    }
-    
-    
 
 }
 
@@ -246,6 +264,7 @@ field::~field()
     free(res_conv);
     free(cov);
     free(lensKernel);
+    free(lensKernelTrue);
 
     if (include_flexion) {
         free(res_f1);
@@ -263,7 +282,31 @@ field::~field()
     fftw_free(fft_frame);
 }
 
-void field::gradient(fftw_complex *delta)
+
+void field::get_pixel_coordinates(double* ra, double* dec)
+{
+    for(int i=0; i < npix; i++){
+        double x = (i + 0.5) * pixel_size - size/2.;
+        
+        for(int j=0; j < npix; j++){
+            double y = (j + 0.5) * pixel_size - size/2.;
+
+            double z = sqrt(x*x + y*y);
+            double c = atan(z);
+            
+            double delta = asin(cos(c) * sin(surv->get_center_dec()) + y / z * sin(c) * cos(surv->get_center_dec()));
+            
+            double denom = z * cos(surv->get_center_dec()) * cos(c) - y * sin(surv->get_center_dec()) * sin(c);
+            
+            double alpha = surv->get_center_ra() + atan2(x * sin(c), denom);
+            
+            ra[j * npix +  i] = alpha / ( M_PI / 180.0 );
+            dec[j * npix + i] = delta / ( M_PI / 180.0 );
+        }
+    }
+}
+
+void field::gradient(fftwf_complex *delta)
 {
     forward_operator(delta);
 
@@ -282,7 +325,7 @@ void field::gradient(fftw_complex *delta)
     adjoint_operator(delta);
 }
 
-void field::gradient_noise(fftw_complex *delta)
+void field::gradient_noise(fftwf_complex *delta)
 {
     for (long ind = 0; ind < ngal; ind++) {
         double theta1 = gsl_ran_flat(rng, 0, 2.0 * M_PI);
@@ -298,14 +341,14 @@ void field::gradient_noise(fftw_complex *delta)
 
     }
 
-    adjoint_operator(delta);
+    adjoint_operator(delta,false);
 }
 
-void field::forward_operator(fftw_complex *delta)
+void field::forward_operator(fftwf_complex *delta)
 {
     double freqFactor = 2.0 * M_PI / pixel_size / ((double) npix);
 
-    fftw_complex *deltaFlex = delta + nlp * npix * npix;
+    fftwf_complex *deltaFlex = delta + nlp * npix * npix;
 
     // First apply the kappa to gamma transform
     #pragma omp parallel for
@@ -424,28 +467,36 @@ void field::forward_operator(fftw_complex *delta)
     for (int i = 0; i < ngal ; i++) {
         res_conv[i] = 0;
         for (int z = 0; z < nlp ; z++) {
-            double q = lensKernel[i * nlp + z];
+            double q = lensKernelTrue[i * nlp + z];
             res_conv[i] += q * ps[z]->f[i][0] * fftFactor;
         }
     }
 }
 
 
-void field::adjoint_operator(fftw_complex *delta)
+void field::adjoint_operator(fftwf_complex *delta, bool preconditionning)
 {
     double freqFactor = 2.0 * M_PI / pixel_size / ((double) npix);
 
-    fftw_complex *deltaFlex = delta + nlp * npix * npix;
+    fftwf_complex *deltaFlex = delta + nlp * npix * npix;
 
     #pragma omp parallel for
     for (int z = 0; z < nlp; z++) {
         double k1, k2, k1k1, k2k2, k1k2, ksqr;
         double denom;
 
-        for (long i = 0; i < ngal ; i++) {
-            double q = lensKernel[i * nlp + z];
-            ps[z]->f[i][0] = res_gamma1[i] * q;
-            ps[z]->f[i][1] = res_gamma2[i] * q;
+        if(preconditionning){
+            for (long i = 0; i < ngal ; i++) {
+                double q = lensKernel[i * nlp + z];
+                ps[z]->f[i][0] = res_gamma1[i] * q;
+                ps[z]->f[i][1] = res_gamma2[i] * q;
+            }
+        }else{
+            for (long i = 0; i < ngal ; i++) {
+                double q = lensKernelTrue[i * nlp + z];
+                ps[z]->f[i][0] = res_gamma1[i] * q;
+                ps[z]->f[i][1] = res_gamma2[i] * q;
+            }
         }
 
         nfft_adjoint_2d(ps[z]);
@@ -504,14 +555,14 @@ void field::adjoint_operator(fftw_complex *delta)
 
 
 // TODO: Check indices and convention for x and y
-void field::combine_components(fftw_complex *delta, fftw_complex *delta_comb)
+void field::combine_components(fftwf_complex *delta, fftwf_complex *delta_comb)
 {
 
     double freqFactor = 2.0 * M_PI / pixel_size / ((double) npix);
     double k1, k2, k1k1, k2k2, k1k2, ksqr;
     double denom;
 
-    fftw_complex *deltaFlex = delta + nlp * npix * npix;
+    fftwf_complex *deltaFlex = delta + nlp * npix * npix;
 
     for (int z = 0; z < nlp; z++) {
 
@@ -546,13 +597,13 @@ void field::combine_components(fftw_complex *delta, fftw_complex *delta_comb)
     }
 }
 
-void field::combine_components_inverse(fftw_complex *delta_comb, fftw_complex *delta)
+void field::combine_components_inverse(fftwf_complex *delta_comb, fftwf_complex *delta)
 {
     double freqFactor = 2.0 * M_PI / pixel_size / ((double) npix);
     double k1, k2, k1k1, k2k2, k1k2, ksqr;
     double denom;
 
-    fftw_complex * deltaFlex = delta + nlp * npix * npix;
+    fftwf_complex * deltaFlex = delta + nlp * npix * npix;
 
     for (int z = 0; z < nlp; z++) {
 
@@ -584,8 +635,8 @@ void field::combine_components_inverse(fftw_complex *delta_comb, fftw_complex *d
 bool field::check_adjoint()
 {
     if (include_flexion) {
-        fftw_complex *delta1 = fftw_alloc_complex(2 * npix * npix * nlp);
-        fftw_complex *delta2 = fftw_alloc_complex(2 * npix * npix * nlp);
+        fftwf_complex *delta1 = fftwf_alloc_complex(2 * npix * npix * nlp);
+        fftwf_complex *delta2 = fftwf_alloc_complex(2 * npix * npix * nlp);
         double *test_g1 = (double *) malloc(sizeof(double) * ngal);
         double *test_g2 = (double *) malloc(sizeof(double) * ngal);
         double *test_f1 = (double *) malloc(sizeof(double) * ngal);
@@ -627,8 +678,8 @@ bool field::check_adjoint()
         std::cout << " Results  of check: " << result_forward << " against " << result_backward  << std::endl;
         std::cout << " Results  of check: " << result_forward2 << " against " << result_backward2  << std::endl;
     }else{
-        fftw_complex *delta1 = fftw_alloc_complex( npix * npix * nlp);
-        fftw_complex *delta2 = fftw_alloc_complex( npix * npix * nlp);
+        fftwf_complex *delta1 = fftwf_alloc_complex( npix * npix * nlp);
+        fftwf_complex *delta2 = fftwf_alloc_complex( npix * npix * nlp);
         
         double *test_g1 = (double *) malloc(sizeof(double) * ngal);
         double *test_g2 = (double *) malloc(sizeof(double) * ngal);
@@ -669,12 +720,275 @@ bool field::check_adjoint()
     return true;
 }
 
+typedef struct {
+    double w_a;
+    nicaea::error **err;
+    nicaea::cosmo *model;
+} int_for_3d_efficiency_params;
+
+#define EPS_GW_INT 1.0E-14
+double int_for_3d_efficiency ( double aprime, void* intpar) {
+    
+    double wprime, fKwp, fKw, fKwwp, dwda;
+    
+    int_for_3d_efficiency_params *params = (int_for_3d_efficiency_params *) intpar ;
+    nicaea::cosmo *self                  = params->model;
+    nicaea::error **err                  = params->err;
+    double w                             = params->w_a;
+    
+    double fac = 1.5/nicaea::dsqr ( R_HUBBLE ) * ( self->Omega_m+ self->Omega_nu_mass ) /aprime;
+
+    wprime = nicaea::w ( self, aprime, 0, err );
+    quitOnError ( *err, __LINE__, stderr );
+    
+    if( wprime >= w ) return 0;
+
+    fKwp   = nicaea::f_K ( self, wprime, err );
+    quitOnError ( *err, __LINE__, stderr );
+
+    fKw   = nicaea::f_K ( self, w, err );
+    quitOnError ( *err, __LINE__, stderr );
+
+    fKwwp  = nicaea::f_K ( self, w - wprime, err );
+    quitOnError ( *err, __LINE__, stderr );
+
+    dwda   = nicaea::dwoverda ( self,aprime,err );
+    quitOnError ( *err, __LINE__, stderr );
+
+    // Prevent very small values of Gw from perturbing the integration
+    if ( fKwwp < EPS_GW_INT ) fKwwp = 0.0;
+
+    return fac * fKwp * fKwwp / fKw * dwda;
+}
+#undef EPS_GW_INT
+
+
+typedef struct {
+    redshift_distribution * redshift;
+    double *x;
+    double *y;
+    gsl_interp *interpolator;
+    gsl_interp_accel *accelerator;
+} int_for_marginalisation_params;
+
+double int_for_marginalisation(double  z, void *intpar){    
+    int_for_marginalisation_params *p = (int_for_marginalisation_params *) intpar;
+
+    return p->redshift->pdf(z) * gsl_interp_eval(p->interpolator, p->x, p->y, z, p->accelerator);
+}
+
+
 void field::compute_3D_lensing_kernel()
 {
-    //TODO: Implement the 3D lensing kernel
-    for (int i = 0; i < ngal * nlp; i++) {
-        lensKernel[i] = 1.0;
+    gsl_interp **interpolators;
+    gsl_interp_accel **accelerators;
+    gsl_integration_workspace **w;
+    double *x;
+    double **y;
+    
+    // First step, compute the lensing efficiency kernel on an interpolation table
+    // to speed up the computation
+    int nzsamp = ZMAX*100;
+    x = (double *) malloc(sizeof(double) * nzsamp);
+    y = (double **) malloc(sizeof(double*) * nlp);
+    w = (gsl_integration_workspace **) malloc(sizeof(gsl_integration_workspace *) * nlp);
+    
+    for(int z=0; z < nlp; z++){
+        y[z] = (double *) malloc(sizeof(double) * nzsamp);
+	w[z] = gsl_integration_workspace_alloc(2048);
     }
+    
+    // Initialize the x array of redshift sampling of the lensing efficiency kernel
+    for(int i=0; i < nzsamp; i++){
+        x[i] = ZMAX/((double) (nzsamp - 1) )*i;
+    }
+    
+    int_for_3d_efficiency_params intpar;
+    intpar.model = model;
+    intpar.err   = err;
+    
+    gsl_function F;
+    F.function = &int_for_3d_efficiency;
+    
+    for(int i=0; i < nzsamp; i++){
+        double a   = 1.0/(1.0 + x[i]); 
+        intpar.w_a = nicaea::w ( model, a, 0, err ); quitOnError ( *err, __LINE__, stderr );
+          
+        F.params = (void *) &intpar;
+	#pragma omp parallel for
+        for (int z=0; z < nlp; z++){
+	  
+	    double result;
+	    double abserr;
+            gsl_integration_qags(&F, 1.0/(zlp_up[z] + 1), 1.0/(zlp_low[z] + 1),
+                                            0, 1.0e-5, 2048, w[z], &result, &abserr); 
+            y[z][i] = result;
+        }
+    }
+
+    // Interpolation table for each z and integrate over p(zsamp) for each galaxy 
+    interpolators = (gsl_interp **) malloc(sizeof(gsl_interp *)*nlp);
+    accelerators  = (gsl_interp_accel **) malloc(sizeof(gsl_interp_accel *)*nlp);
+    for(int z=0; z < nlp; z++){
+        interpolators[z] = gsl_interp_alloc(gsl_interp_cspline, nzsamp);
+        accelerators[z]  = gsl_interp_accel_alloc();
+        gsl_interp_init(interpolators[z], x, y[z], nzsamp);
+    }
+    
+    // Deactivate default gsl error handling
+    gsl_error_handler_t * handler =  gsl_set_error_handler_off();
+    
+    // Compute lensing efficiency kernel for each galaxy by marginalising over pdf
+    for (int i = 0; i < ngal; i++) {
+        if(i % 100 == 0) std::cout  << "Processed " << i << "/" << ngal << " galaxies\r" << std::flush;
+        redshift_distribution * redshift=surv->get_redshift(i);
+        
+	#pragma omp parallel for
+        for(int z=0; z <nlp; z++){
+	    double result;
+	    double abserr;
+        
+	    int_for_marginalisation_params params;
+	    params.x = x;
+	    gsl_function G;
+	    G.function = &int_for_marginalisation;
+            params.y = y[z];
+            params.accelerator = accelerators[z];
+            params.interpolator = interpolators[z];
+            params.redshift = redshift;
+            G.params = (void *) &params;
+
+            // In case of a spectroscopic redshift, we can skip the integration
+            if (redshift->get_zmax() == redshift->get_zmin()){
+                result = int_for_marginalisation(0.5*(redshift->get_zmin() + redshift->get_zmax()), (void *) &params);
+            }else{
+                int ret_code = gsl_integration_qags(&G, std::max(0., redshift->get_zmin()),
+                                        std::min(ZMAX, redshift->get_zmax()), 0, 1.0e-4, 1024, w[z], &result, &abserr);
+                // If standard gsl integration fails, falls back to trapezoid method
+                if(ret_code != 0){
+                    //std::cout << "Warning: Integration of galaxy redshift pdf did not converge. Galaxy id: " << i << "; value: " << result << std::endl;
+                    double a = std::max(0., redshift->get_zmin());
+                    double b = std::min(ZMAX, redshift->get_zmax());
+                    long n = 1024;
+                    
+                    double h = (b - a)/((double) n);
+                    result = 0;
+                    for(long it=0; it < (n - 1); it++){
+                        double x1 = it*h + a;
+                        double x2 = (it+1)*h + a;
+                        result += int_for_marginalisation(x1, (void *) &params) + int_for_marginalisation(x2, (void *) &params);
+                    }
+                    result *= h/2.;
+                }
+            }
+            lensKernel[i * nlp + z] = std::max(result, 0.);
+
+        }
+        
+    }
+    
+    // Reset default gsl error handling
+    gsl_set_error_handler(NULL);
+    std::cout  << "Processed " << ngal << "/" << ngal << " galaxies" << std::endl;
+    
+#ifdef DEBUG_FITS
+    dblarray toto;
+    toto.alloc(lensKernel, nlp, ngal, 1);
+    fits_write_dblarr("lensKernel.fits",toto);
+#endif    
+    
+    // Free all unnecessary arrays
+    for(int z=0; z < nlp; z++){
+        gsl_interp_free(interpolators[z]);
+        gsl_interp_accel_free(accelerators[z]);
+	gsl_integration_workspace_free(w[z]);
+        free(y[z]);
+    }
+    free(x);
+    free(y);
+    free(w);
+    
+    // Apply SVD regularisation to the lensing operator
+    int nsmall = std::min( ngal, 20000l );
+    arma::mat A ( ngal, nlp );
+    arma::mat Asmall ( nsmall, nlp );
+    arma::mat U;
+    arma::vec s;
+    arma::mat V;
+    
+    // Select random indices out of the entire survey to compute Asmall
+    std::vector<int> indices;
+    for (int i=0; i<ngal; ++i) indices.push_back(i);
+    std::random_shuffle(indices.begin(), indices.end());
+    
+    for ( long int ind =0; ind < ngal; ind++ )
+        for ( int z=0; z < nlp; z++ ) {
+            if ( ind < nsmall )   Asmall (ind, z ) = lensKernel[indices[ind]*nlp + z];
+
+            A ( ind,z ) = lensKernel[ind*nlp + z];
+            lensKernelTrue[ind*nlp + z] = lensKernel[ind*nlp + z];
+        }
+
+    // Compute the pseudo-inverse of the lensing kernel so that we can have much faster convergence
+    svd ( U, s, V, Asmall );
+
+    // Compute the preconditionning matrix from s and V
+    // First, regularise s
+    double maxS = s ( 0 );
+    s.resize ( nlp );
+    for ( int i=0; i< nlp; i++ ) {
+        if ( s ( i ) > r_cond*maxS ) {
+            s ( i ) = 1.0/s ( i );
+        }
+        else {
+            s ( i ) = 1.0/ ( r_cond*maxS );
+        }
+        if ( i >= nsmall ) {
+            s ( i ) = 1.0;
+        }
+    }
+
+    // Now build the preconditionning matrix
+    arma::mat Pr = V * diagmat ( s ) * V.t();
+    arma::mat PPr = Pr*Pr.t();
+
+    arma::mat IP = inv ( Pr );
+
+    // Build the conditionned Q matrix
+    arma::mat AP = A * Pr;
+
+    // Extract the preconditionning matrix and conditionned tomographic lensing operator
+    for ( long int ind =0; ind < ngal; ind++ ) {
+        for ( int z=0; z < nlp; z++ ) {
+            lensKernel[ind*nlp + z] = AP ( ind,z );
+        }
+    }
+
+    // Saves the preconditionning matrix for later
+    for ( int z1=0; z1 < nlp; z1++ ) {
+        for ( int z2=0; z2 < nlp; z2++ ) {
+            P [z2*nlp + z1] = Pr ( z1,z2 );
+            iP[z2*nlp + z1] = IP ( z1,z2 );
+            PP[z2*nlp + z1] = PPr(z1,z2);
+        }
+    }
+    
+#ifdef DEBUG_FITS
+    dblarray top;
+    top.alloc(P,nlp,nlp,1);
+    
+    dblarray toip;
+    toip.alloc(iP,nlp,nlp,1);
+    
+    dblarray topp;
+    topp.alloc(PP,nlp,nlp,1);
+    
+    fits_write_dblarr("P.fits", top);
+    fits_write_dblarr("IP.fits", toip);
+    fits_write_dblarr("PP.fits", topp);
+    fits_write_dblarr("QP.fits", toto);
+#endif
+    
 }
 
 typedef struct {
@@ -743,9 +1057,11 @@ void field::compute_surface_lensing_kernel()
         } else {
             params.redshift = redshift;
             F.params = (void *) &params;
-            gsl_integration_qags(&F, std::max(model->a_min, a_inf), a_lens, 0, 1.0e-5, 1024, w, &result, &abserr);
+            gsl_integration_qags(&F, std::max(std::max(model->a_min, a_inf), 1./(redshift->get_zmax() + 1.)),
+                                     std::min(a_lens, 1./(redshift->get_zmin() + 1.)), 0, 1.0e-5, 1024, w, &result, &abserr);
             lensKernel[i] = result;
         }
+        lensKernelTrue[i] = lensKernel[i];
     }
 
     gsl_integration_workspace_free(w);
@@ -761,8 +1077,8 @@ double field::get_spectral_norm(int niter, double tol) {
     if(include_flexion)
         ncoeff *= 2;
 
-    fftw_complex* kap = fftw_alloc_complex(ncoeff);
-    fftw_complex* kap_tmp = fftw_alloc_complex(ncoeff);
+    fftwf_complex* kap = fftwf_alloc_complex(ncoeff);
+    fftwf_complex* kap_tmp = fftwf_alloc_complex(ncoeff);
 
     norm= 0;
     for(long ind =0; ind< ncoeff; ind++) {
@@ -827,7 +1143,7 @@ double field::get_spectral_norm(int niter, double tol) {
 
 }
 
-void field::update_covariance(fftw_complex* delta)
+void field::update_covariance(fftwf_complex* delta)
 {
     double freqFactor = 2.0 * M_PI / pixel_size / ((double) npix);
     // Compute the value of the field evaluated at each galaxy position
@@ -860,7 +1176,7 @@ void field::update_covariance(fftw_complex* delta)
     for (int i = 0; i < ngal ; i++) {
         res_conv[i] = 0;
         for (int z = 0; z < nlp ; z++) {
-            double q = lensKernel[i * nlp + z];
+            double q = lensKernelTrue[i * nlp + z];
             res_conv[i] += q * ps[z]->f[i][0] * fftFactor;
         }
     }

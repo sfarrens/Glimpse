@@ -32,36 +32,39 @@
  * 
  */
 
-#include "redshift_distribution.h"
+#ifndef GPU_UTILS_H
+#define GPU_UTILS_H
 
- 
-pdf_redshift::pdf_redshift(std::valarray< double >& zSampling, std::valarray< double >& pdz)
-{
-  
-  // Allocate arrays to store pdf samples
-  nPoints = zSampling.size();
-  x = (double*) malloc(sizeof(double) * nPoints);
-  y = (double*) malloc(sizeof(double) * nPoints);
-  
-  // Copy array data
-  for(int i =0; i < nPoints; i++){
-      x[i] = zSampling[i];
-      y[i] = pdz[i];
-  }
-  
-  interpolator = gsl_interp_alloc(gsl_interp_cspline, nPoints);
-  accelerator = gsl_interp_accel_alloc();
-  
-  gsl_interp_init(interpolator, x, y, nPoints);
-  
-  // Compute normalization factor
-  normalizationFactor = 1.0 / gsl_interp_eval_integ(interpolator, x, y, x[0], x[nPoints-1], accelerator);
+#define MAX_GPUS 64
+
+//TODO: Implement a cleaner way to select GPUs
+extern int gpuIDs[MAX_GPUS];
+extern int gpuCount;
+
+// Sets the number and IDs of GPUs to use
+static void setWhichGPUs(int count, int* whichGPUs){
+    
+    gpuCount = count;
+    int i = 0;
+    for(i=0; i < count; i++){
+        gpuIDs[i] = whichGPUs[i];
+    }
+    
 }
 
-pdf_redshift::~pdf_redshift()
-{
-  gsl_interp_accel_free(accelerator);
-  gsl_interp_free(interpolator);
-  free(x);
-  free(y);
+// Get the number of GPUs to use
+static void getDeviceCount(int *count){
+    count[0] = gpuCount; 
 }
+
+// Sets the gpus index in the provided array, 
+// must be pre-allocated to be larger than deviceCount
+static void getGPUs(int* whichGPUs){
+    int i=0;
+    for(i=0; i < gpuCount; i++){
+        whichGPUs[i] = gpuIDs[i];
+    }
+}
+
+
+#endif

@@ -42,6 +42,7 @@
 
 #include "survey.h"
 
+
 // Reference redshift used to compute the 2D convergence maps
 #define Z_INF 1000
 
@@ -57,9 +58,8 @@ class field
   // Field geometry
   int      npix;		      	/*!< Number of pixels */
   double   pixel_size;		      	/*!< Size of the pixels, in radians */
-  std::valarray<double> grid_ra;      	/*!< Right Ascension coordinates of the pixel centers, in radians */
-  std::valarray<double> grid_dec;     	/*!< Declination coordinates of the pixel centers, in radians */
   int      padding_size;	      	/*!< Number of pixels included in the zero padding */
+  double   size;                        /*!< Effective size of the field, including padding, in radians */
   double   convert_coordinates_unit;  	/*!< Factor to convert the provided coordinates in radians */
 
   int      nlp;			      	/*!< Number of lens planes */
@@ -71,7 +71,7 @@ class field
   int NpixFFT;
   double fftFactor;
   nfft_plan** ps;
-  fftw_complex* fft_frame;
+  fftwf_complex* fft_frame;
   
   // Survey data
   long     ngal;                /*!< Number of galaxies */
@@ -91,7 +91,14 @@ class field
   double * res_f2;              /*!< Array storing the gamma residuals for each galaxy.*/
   double * res_conv;            /*!< Array storing the convergence for each galaxy.*/
   double * cov;                 /*!< Array to store the covariance matrix resulting from the reduced shear.*/
-  double * lensKernel;          /*!< Array storing the lensing efficiency kernel for each galaxy.*/  
+  double * lensKernel;          /*!< Array storing the conditionned lensing efficiency kernel for each galaxy.*/  
+  double * lensKernelTrue;      /*!< Array storing the original lensing efficiency kernel for each galaxy.*/  
+
+  // 3D specific variables
+  double r_cond;                /*!< Condition number used for the pre-conditioning matrix. */
+  double * P;                   /*!< Preconditionning matrix */
+  double * PP;                  /*!< Square of the preconditionning matrix */
+  double * iP;                  /*!< Inverse of the preconditionning matrix */  
   
   survey *surv;                 /*!< Reference to the survey object */
   
@@ -113,12 +120,12 @@ class field
   /*! Computes the forward lensing transform from density to shear.
    * 
    */
-  void forward_operator(fftw_complex *delta);
+  void forward_operator(fftwf_complex *delta);
   
   /*! Compute the adjoint operation.
    * 
    */
-  void adjoint_operator(fftw_complex *delta);
+  void adjoint_operator(fftwf_complex *delta, bool preconditionning=true);
   
 public:
   /*! Constructor from configuration file and survey
@@ -136,20 +143,33 @@ public:
         return npix;
   }
 
+  /*! Return the number of lens planes.
+   * 
+   */
+  int get_nlp() {
+        return nlp;
+  }
+  
+  /*! Returns the (ra, dec) of the pixel centers in degrees.
+   * \a ra and \a dec are two preallocated arrays of size NxN
+   * where N is the number of pixels
+   */
+   void get_pixel_coordinates(double * ra, double *dec);
+  
   /*! Computes the gradient of the chi_2 for a given delta field.
    * 
    */
-  void gradient(fftw_complex *delta);
+  void gradient(fftwf_complex *delta);
 
   /*! Computes the gradient of the chi_2 for a given delta field and randomized measurements.
    * 
    */
-  void gradient_noise(fftw_complex *delta);
+  void gradient_noise(fftwf_complex *delta);
   
   /*! Updates the non-linear correction factor in the covariance matrix.
    * 
    */
-  void update_covariance(fftw_complex *kappa);
+  void update_covariance(fftwf_complex *delta);
 
   /*! Computes the spectral norm of the lensing operator
    * 
@@ -164,13 +184,17 @@ public:
   /*! Combines shear and flexion components applying a minimum variance filter
    * 
    */
-  void combine_components(fftw_complex * delta, fftw_complex * delta_comb);
+  void combine_components(fftwf_complex * delta, fftwf_complex * delta_comb);
   
   /*! Copies the same combined field into shear and flexion commponents
    * 
    */
-  void combine_components_inverse(fftw_complex * delta_comb, fftw_complex * delta);
-
+  void combine_components_inverse(fftwf_complex * delta_comb, fftwf_complex * delta);
+  
+  /*! Returns the preconditioning matrix
+   * 
+   */
+  const double * get_preconditioning_matrix(){ return P; }
 };
 
 #endif // FIELD_H

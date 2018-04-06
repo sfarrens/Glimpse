@@ -32,36 +32,25 @@
  * 
  */
 
-#include "redshift_distribution.h"
+#include <cuda_runtime.h>
+#include <cuda.h>
+#include <iostream>
 
- 
-pdf_redshift::pdf_redshift(std::valarray< double >& zSampling, std::valarray< double >& pdz)
+// Maximum size of the p matrix, corresponding to a 64*64 matrix 
+#define SIZE_P          4096
+
+
+#define checkCudaErrors(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort = true)
 {
-  
-  // Allocate arrays to store pdf samples
-  nPoints = zSampling.size();
-  x = (double*) malloc(sizeof(double) * nPoints);
-  y = (double*) malloc(sizeof(double) * nPoints);
-  
-  // Copy array data
-  for(int i =0; i < nPoints; i++){
-      x[i] = zSampling[i];
-      y[i] = pdz[i];
-  }
-  
-  interpolator = gsl_interp_alloc(gsl_interp_cspline, nPoints);
-  accelerator = gsl_interp_accel_alloc();
-  
-  gsl_interp_init(interpolator, x, y, nPoints);
-  
-  // Compute normalization factor
-  normalizationFactor = 1.0 / gsl_interp_eval_integ(interpolator, x, y, x[0], x[nPoints-1], accelerator);
+    if (code != cudaSuccess) {
+        std::cerr << "CUDA Error : " << cudaGetErrorString(code) << " " << file << " " << line << std::endl;
+        if (abort) {
+            exit(code);
+        }
+    }
 }
 
-pdf_redshift::~pdf_redshift()
-{
-  gsl_interp_accel_free(accelerator);
-  gsl_interp_free(interpolator);
-  free(x);
-  free(y);
-}
+void spg_store_matrix( unsigned int nz, float *p, float *pp );
+void spg_l1( unsigned long nx, unsigned int nz, float *pt_u, float *pt_x, float *pt_w, int niter );
+void spg_pos(unsigned long nx, unsigned int nz, float *pt_u, float *pt_x, int niter);

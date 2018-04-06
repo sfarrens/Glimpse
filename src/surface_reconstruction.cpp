@@ -33,6 +33,9 @@
  */
 #include <iostream>
 #include <cmath>
+#ifdef DEBUG_FITS
+#include <sparse2d/IM_IO.h>
+#endif
 
 #include "surface_reconstruction.h"
 
@@ -43,6 +46,7 @@ surface_reconstruction::surface_reconstruction(boost::property_tree::ptree confi
     f = fi;
     // Get options from the configuration file.
     nRecIter      = config.get<int>("parameters.niter", 500);
+    nRecIterDebias= config.get<int>("parameters.niter_debias", 500);
     nscales       = config.get<int>("parameters.nscales", 4);
     lambda        = config.get<double>("parameters.lambda", 4.0);
     nrandom       = config.get<int>("parameters.nrandom", 1000.0);
@@ -69,20 +73,20 @@ surface_reconstruction::surface_reconstruction(boost::property_tree::ptree confi
     nwavcoeff = npix * npix * nframes;
 
     // Allocating internal arrays
-    kappa       = fftw_alloc_complex(ncoeff);
-    kappa_u     = fftw_alloc_complex(ncoeff);
-    kappa_rec   = fftw_alloc_complex(ncoeff);
-    kappa_old   = fftw_alloc_complex(ncoeff);
-    kappa_grad  = fftw_alloc_complex(ncoeff);
-    kappa_tmp   = fftw_alloc_complex(ncoeff);
-    kappa_trans = fftw_alloc_complex(ncoeff);
-    alpha       = (double *) malloc(sizeof(double) * nwavcoeff);
-    alpha_u     = (double *) malloc(sizeof(double) * nwavcoeff);
-    alpha_res   = (double *) malloc(sizeof(double) * nwavcoeff);
-    alpha_tmp   = (double *) malloc(sizeof(double) * nwavcoeff);
-    thresholds  = (double *) malloc(sizeof(double) * nwavcoeff);
-    weights     = (double *) malloc(sizeof(double) * nwavcoeff);
-    support     = (double *) malloc(sizeof(double) * nwavcoeff);
+    kappa       = fftwf_alloc_complex(ncoeff);
+    kappa_u     = fftwf_alloc_complex(ncoeff);
+    kappa_rec   = fftwf_alloc_complex(ncoeff);
+    kappa_old   = fftwf_alloc_complex(ncoeff);
+    kappa_grad  = fftwf_alloc_complex(ncoeff);
+    kappa_tmp   = fftwf_alloc_complex(ncoeff);
+    kappa_trans = fftwf_alloc_complex(ncoeff);
+    alpha       = (float *) malloc(sizeof(float) * nwavcoeff);
+    alpha_u     = (float *) malloc(sizeof(float) * nwavcoeff);
+    alpha_res   = (float *) malloc(sizeof(float) * nwavcoeff);
+    alpha_tmp   = (float *) malloc(sizeof(float) * nwavcoeff);
+    thresholds  = (float *) malloc(sizeof(float) * nwavcoeff);
+    weights     = (float *) malloc(sizeof(float) * nwavcoeff);
+    support     = (float *) malloc(sizeof(float) * nwavcoeff);
 
     // Initialise internal arrays
     for (long ind = 0; ind < ncoeff; ind++) {
@@ -105,16 +109,16 @@ surface_reconstruction::surface_reconstruction(boost::property_tree::ptree confi
         alpha_u[ind]   = 0;
         alpha_res[ind] = 0;
         alpha_tmp[ind] = 0;
-        thresholds[ind] = 0;
+        thresholds[ind]= 0;
         weights[ind]   = 1;
         support[ind]   = 1;
     }
 
     // Normalization factor for the fft
     fftFactor     = 1.0 / (((double)npix) * npix);
-    fft_frame     = fftw_alloc_complex(ncoeff);
-    plan_forward  = fftw_plan_dft_2d(npix, npix, fft_frame, fft_frame, FFTW_FORWARD,  FFTW_MEASURE);
-    plan_backward = fftw_plan_dft_2d(npix, npix, fft_frame, fft_frame, FFTW_BACKWARD, FFTW_MEASURE);
+    fft_frame     = fftwf_alloc_complex(ncoeff);
+    plan_forward  = fftwf_plan_dft_2d(npix, npix, fft_frame, fft_frame, FFTW_FORWARD,  FFTW_MEASURE);
+    plan_backward = fftwf_plan_dft_2d(npix, npix, fft_frame, fft_frame, FFTW_BACKWARD, FFTW_MEASURE);
 
     // Initialize the threshold levels, with lower thresholds on larger scales
     sigma_thr = (double *) malloc(sizeof(double) * nframes);
@@ -130,11 +134,6 @@ surface_reconstruction::surface_reconstruction(boost::property_tree::ptree confi
         sigma_thr[i] = bl_reg;
     }
 
-    // Using only the first scale of the BL transform
-    for (int i = nscales + 3; i < nframes ; i++) {
-        sigma_thr[i] = 0;
-    }
-
     mu1 = get_spectral_norm_prox(100, 1e-7);
     // mu2 = f->get_spectral_norm(200, 1e-7);
     sig = 1.0 / mu1;
@@ -144,14 +143,14 @@ surface_reconstruction::surface_reconstruction(boost::property_tree::ptree confi
 
 surface_reconstruction::~surface_reconstruction()
 {
-    fftw_free(kappa);
-    fftw_free(kappa_u);
-    fftw_free(kappa_rec);
-    fftw_free(kappa_old);
-    fftw_free(kappa_grad);
-    fftw_free(kappa_tmp);
-    fftw_free(kappa_trans);
-    fftw_free(fft_frame);
+    fftwf_free(kappa);
+    fftwf_free(kappa_u);
+    fftwf_free(kappa_rec);
+    fftwf_free(kappa_old);
+    fftwf_free(kappa_grad);
+    fftwf_free(kappa_tmp);
+    fftwf_free(kappa_trans);
+    fftwf_free(fft_frame);
     free(sigma_thr);
     free(alpha);
     free(alpha_u);
@@ -160,8 +159,9 @@ surface_reconstruction::~surface_reconstruction()
     free(thresholds);
     free(weights);
 
-    // TODO: delete fftw plans ?
-
+    fftwf_destroy_plan(plan_forward);
+    fftwf_destroy_plan(plan_backward);
+    
     delete wav;
 }
 
@@ -203,11 +203,11 @@ void surface_reconstruction::run_main_iteration(long int niter, bool debias)
             fft_frame[ind][0] = kappa_tmp[ind][0] * fftFactor;
             fft_frame[ind][1] = kappa_tmp[ind][1] * fftFactor;
         }
-        fftw_execute(plan_backward);
+        fftwf_execute(plan_backward);
 
         if (positivity) {
             for (long ind = 0; ind < npix * npix; ind++) {
-                fft_frame[ind][0] = max(fft_frame[ind][0], 0.);
+                fft_frame[ind][0] = max(fft_frame[ind][0], 0.f);
                 fft_frame[ind][1] = 0;
             }
         } else {
@@ -216,7 +216,7 @@ void surface_reconstruction::run_main_iteration(long int niter, bool debias)
             }
         }
 
-        fftw_execute(plan_forward);
+        fftwf_execute(plan_forward);
         for (long ind = 0; ind < npix * npix; ind++) {
             kappa_tmp[ind][0] = fft_frame[ind][0];
             kappa_tmp[ind][1] = fft_frame[ind][1];
@@ -257,22 +257,29 @@ void surface_reconstruction::reconstruct()
 {
     std::cout << "Computing thresholds" << std::endl;
     compute_thresholds(nrandom);
-
+#ifdef DEBUG_FITS
+    // Saves the thresholds
+    fltarray thr;
+    thr.alloc(thresholds, npix,npix,nframes);
+    fits_write_fltarr("thresholds.fits", thr);
+#endif
+    
     std::cout << "Running main iteration" << std::endl;
     run_main_iteration(nRecIter);
 
+
     // Reweighted l1 loop
     for (int i = 0; i < nreweights ; i++) {
-        f->update_covariance(kappa);
-        compute_thresholds(nrandom / 2);
-        compute_weights();
-        run_main_iteration(nRecIter / 2);
-    }
-
+         f->update_covariance(kappa);
+         compute_thresholds(nrandom / 2);
+         compute_weights();
+         run_main_iteration(nRecIter / 2);
+     }
+ 
     std::cout  << "Starting debiasing " << std::endl;
     // Final debiasing step
     f->update_covariance(kappa);
-    run_main_iteration(nRecIter * 5, true);
+    run_main_iteration(nRecIterDebias, true);
 }
 
 void surface_reconstruction::compute_thresholds(int niter)
@@ -301,15 +308,13 @@ void surface_reconstruction::compute_thresholds(int niter)
             maxThr = thresholds[n * npix * npix + ind] > maxThr ? thresholds[n * npix * npix + ind] : maxThr;
         }
         for (long ind = 0; ind < npix * npix; ind++) {
-            thresholds[n * npix * npix + ind] = max(thresholds[n * npix * npix + ind], maxThr * 0.1);
+            thresholds[n * npix * npix + ind] = max(thresholds[n * npix * npix + ind], (float) (maxThr * 0.1));
         }
     }
 }
 
 double surface_reconstruction::get_spectral_norm_prox(int niter, double tol)
 {
-
-    double *pt_vec = (double *) malloc(sizeof(double) * npix * npix * nframes);
 
     double norm = 0;
     double norm_old = 0;
@@ -351,9 +356,6 @@ double surface_reconstruction::get_spectral_norm_prox(int niter, double tol)
         norm_old = norm;
     }
 
-
-    free(pt_vec);
-
     return norm * (1.0 + tol);
 }
 
@@ -365,13 +367,13 @@ void surface_reconstruction::compute_weights()
         fft_frame[ind][0] = kappa[ind][0] * fftFactor;
         fft_frame[ind][1] = kappa[ind][1] * fftFactor;
     }
-    fftw_execute(plan_backward);
+    fftwf_execute(plan_backward);
     for (long ind = 0; ind < npix * npix; ind++) {
-        fft_frame[ind][0] = max(fft_frame[ind][0], 0.0);
+        fft_frame[ind][0] = max(fft_frame[ind][0], 0.0f);
         fft_frame[ind][1] = 0;
     }
 
-    fftw_execute(plan_forward);
+    fftwf_execute(plan_forward);
     for (long ind = 0; ind < npix * npix; ind++) {
         kappa_tmp[ind][0] = fft_frame[ind][0];
         kappa_tmp[ind][1] = fft_frame[ind][1];
@@ -396,7 +398,7 @@ void surface_reconstruction::get_convergence_map(double *kap)
         fft_frame[ind][1] = kappa[ind][1] * fftFactor;
     }
 
-    fftw_execute(plan_backward);
+    fftwf_execute(plan_backward);
 
     for (int y = 0; y < npix ; y++) {
         for (int x = 0; x < npix ; x++) {
