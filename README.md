@@ -1,4 +1,5 @@
 # Glimpse
+[![Build Status](https://travis-ci.org/CosmoStat/Glimpse.svg?branch=master)](https://travis-ci.org/CosmoStat/Glimpse)
 
 Glimpse is a sparsity based mass-mapping algorithm. See the
 [Glimpse page](http://www.cosmostat.org/software/glimpse) on the
@@ -60,11 +61,11 @@ Glimpse can be used to recontruct a 3D field using the same command line:
   ```
     $ glimpse config3d.ini cat_3_0.fits delta.fits
   ```
-An example of *config3d.ini* can be found in the *example* directory. 
+An example of *config3d.ini* can be found in the *example* directory.
 
 ## GP-GPU
 
-Reconstructing a 3D field is very computationally demanding, and using a GPU is higly recommended to speed up the reconstruction. If an installation of CUDA can be 
+Reconstructing a 3D field is very computationally demanding, and using a GPU is higly recommended to speed up the reconstruction. If an installation of CUDA can be
 detected on your system, CMake will automatically compile GPU specific code to
 replace the CPU implementation.
 
