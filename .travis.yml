@@ -1,6 +1,11 @@
 # Enable C++ support
 language: cpp
 
+ cache:
+    directories:
+      - /home/travis/build/CosmoStat/Glimpse/build/SPARSE2D
+      - /home/travis/build/CosmoStat/Glimpse/build/NICAEA
+
 # Compiler selection
 compiler:
     - gcc
