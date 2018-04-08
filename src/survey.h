@@ -68,6 +68,7 @@ class survey
     F2,
     Z,
     PZ,
+    ZSAMP,
     MAG,
     ZSIG_MIN,
     ZSIG_MAX,
@@ -93,8 +94,7 @@ class survey
   // Data format
   double convert_coordinates_unit;	/*!< Factor to convert the provided coordinates to radians */
   std::map<int,std::string> column_map;	/*!< Maps the fields to their columns in FITS files */
-  int hdu_number;
-
+  std::vector< int > hdu_list;		/*!< List of HDUs that should be read from the FITS file. */
   
   /*! Vectors storing the shapes and redshifts */
   std::vector<std::pair<shape_measurement *, redshift_distribution *> > shape_catalogue;
@@ -195,7 +195,6 @@ public:
     double get_flexion_weight(long gal_index) {
         return shape_catalogue[gal_index].first->w_f;
     }
-    
     
     /*! Returns the redshift distribution of the specified galaxy
      *  \a gal_index   : index of the galaxy in the catalogue */

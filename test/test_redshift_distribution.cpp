@@ -1,4 +1,5 @@
-/*! Copyright CEA, 2015-2016
+/*
+ * Copyright CEA, 2015
  * author : Francois Lanusse < francois.lanusse@gmail.com >
  * 
  * This software is a computer program whose purpose is to reconstruct mass maps
@@ -31,37 +32,15 @@
  * knowledge of the CeCILL license and that you accept its terms.
  * 
  */
+#define BOOST_TEST_DYN_LINK
+#define BOOST_TEST_MODULE "redshift_distribution_module"
+#include <boost/test/unit_test.hpp>
 
 #include "redshift_distribution.h"
 
- 
-pdf_redshift::pdf_redshift(std::valarray< double >& zSampling, std::valarray< double >& pdz)
+BOOST_AUTO_TEST_CASE( integration )
 {
+  photometric_redshift redshift(0.1,0.3,0.3);
   
-  // Allocate arrays to store pdf samples
-  nPoints = zSampling.size();
-  x = (double*) malloc(sizeof(double) * nPoints);
-  y = (double*) malloc(sizeof(double) * nPoints);
-  
-  // Copy array data
-  for(int i =0; i < nPoints; i++){
-      x[i] = zSampling[i];
-      y[i] = pdz[i];
-  }
-  
-  interpolator = gsl_interp_alloc(gsl_interp_cspline, nPoints);
-  accelerator = gsl_interp_accel_alloc();
-  
-  gsl_interp_init(interpolator, x, y, nPoints);
-  
-  // Compute normalization factor
-  normalizationFactor = 1.0 / gsl_interp_eval_integ(interpolator, x, y, x[0], x[nPoints-1], accelerator);
-}
-
-pdf_redshift::~pdf_redshift()
-{
-  gsl_interp_accel_free(accelerator);
-  gsl_interp_free(interpolator);
-  free(x);
-  free(y);
+  BOOST_CHECK( redshift.pdf(1.0) > 0 );
 }

@@ -1,0 +1,27 @@
+# Enable C++ support
+language: cpp
+
+cache:
+    directories:
+      - /home/travis/build/CosmoStat/Glimpse/build/SPARSE2D
+      - /home/travis/build/CosmoStat/Glimpse/build/NICAEA
+
+# Compiler selection
+compiler:
+    - gcc
+
+sudo: required
+
+before_install:
+    - sudo apt-get update -qq
+    - sudo apt-get install -qq cmake libgsl0-dev libfftw3-3  libccfits-dev libnfft3-dev libarmadillo-dev libboost-all-dev
+#- sudo apt-get install -qq nvidia-cuda-dev
+
+install: true
+
+# Build steps
+script:
+    - mkdir -p build && cd build
+    - cmake ..
+    - make
+    - ./glimpse --version

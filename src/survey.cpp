@@ -33,7 +33,10 @@
  */
 
 #include <CCfits/CCfits>
+#include <iostream>  
+#include <string> 
 #include <CCfits/FITSBase.h>
+#include <boost/tokenizer.hpp>
 #include "survey.h"
 
 
@@ -64,7 +67,6 @@ survey::survey(boost::property_tree::ptree config)
     size       = config.get<double>("survey.size")       * convert_coordinates_unit;
 
     // Retrieving FITS column names, in case they differ from standards
-    hdu_number           = config.get<int>("survey.hdu",        1);
     column_map[RA]       = config.get<string>("survey.ra",      "ra");
     column_map[DEC]      = config.get<string>("survey.dec",     "dec");
     column_map[E1]       = config.get<string>("survey.e1",      "e1");
@@ -75,9 +77,19 @@ survey::survey(boost::property_tree::ptree config)
     column_map[W_F]      = config.get<string>("survey.w_f",     "w_f");
     column_map[MAG]      = config.get<string>("survey.mag",     "mag");
     column_map[Z]        = config.get<string>("survey.z",       "z");
-    column_map[ZSIG_MIN] = config.get<string>("survey.zsig_min", "zsig_min");
-    column_map[ZSIG_MAX] = config.get<string>("survey.zsig_max", "zsig_max");
+    column_map[ZSIG_MIN] = config.get<string>("survey.zsig_min","zsig_min");
+    column_map[ZSIG_MAX] = config.get<string>("survey.zsig_max","zsig_max");
     column_map[PZ]       = config.get<string>("survey.pz",      "pz");
+    column_map[ZSAMP]    = config.get<string>("survey.zsamp",   "zsamp");
+    
+    // List of fits HDUs to consider
+    boost::char_separator<char> sep(",");
+    typedef boost::tokenizer< boost::char_separator<char> > t_tokenizer;
+    t_tokenizer tok( config.get<string>("survey.hdu", "1"), sep);
+    for (t_tokenizer::iterator beg = tok.begin(); beg != tok.end(); ++beg)
+    {
+	hdu_list.push_back( stoi( *beg ) );
+    }
     
     flexion_available = false;
     
@@ -92,10 +104,11 @@ survey::~survey()
 void survey::load(string fileName)
 {
     std::vector<string> hdus;
+
     std::valarray < double > ra, dec, e1, e2, f1, f2, w_e, w_f;
     std::valarray < double > z, zsig, zsig_min, zsig_max, mag;
     std::vector< std::valarray < double > > pz;
-    std::valarray < double > zsamp;
+    std::vector< std::valarray < double > > zsamp;
     redshift_types ztype;
     bool has_flexion = false;
     bool has_weights = false;
@@ -103,10 +116,11 @@ void survey::load(string fileName)
     // Reading the data file
     std::auto_ptr<FITS> pInfile(new FITS(fileName, Read));
     
-    ExtHDU &table = pInfile->extension(hdu_number);
-
-    // Identify the type of data contained in this HDU
+    for(int h=0; h < hdu_list.size(); h++){
     
+    ExtHDU &table = pInfile->extension(hdu_list[h]);
+
+
     // Check coordinates
     if (table.column().find(column_map[RA]) == table.column().end() ||
         table.column().find(column_map[DEC]) == table.column().end()) {
@@ -122,7 +136,7 @@ void survey::load(string fileName)
     }
 
     // Check for flexion
-    if (table.column().find(column_map[F1]) != table.column().end() && 
+    if (table.column().find(column_map[F1]) != table.column().end() &&
         table.column().find(column_map[F2]) != table.column().end()) {
         has_flexion = true;
 	flexion_available = true;
@@ -168,9 +182,10 @@ void survey::load(string fileName)
             table.column(column_map[W_F]).read(w_f, 1, nrows);
         }
     }
-
     if (ztype == DISTRIBUTION) {
         table.column(column_map[PZ]).readArrays(pz, 1, nrows);
+        table.column(column_map[ZSAMP]).readArrays(zsamp, 1, nrows);
+        
     }
     if (ztype == DIRAC || ztype == GAUSSIAN) {
         table.column(column_map[Z]).read(z, 1, nrows);
@@ -185,8 +200,8 @@ void survey::load(string fileName)
         double dec_rad = dec[i] * convert_coordinates_unit;
 
 	// Test if galaxy falls within the survey footprint, otherwise skip it
-	if( ((ra_rad  - center_ra)  > size/2 ) &&
-	    ((dec_rad - center_dec) > size/2 ))
+	if( (fabs(ra_rad  - center_ra)  > size/2 ) ||
+	    (fabs(dec_rad - center_dec) > size/2 ))
 	    continue;
 
         shape_measurement *shape = new shape_measurement;
@@ -211,7 +226,6 @@ void survey::load(string fileName)
 	    shape->f[1] = 0;
 	    shape->w_f  = 0.0;
 	}
-
         redshift_distribution *redshift;
         if (ztype == DIRAC) {
             redshift = new spectroscopic_redshift(z[i]);
@@ -220,10 +234,11 @@ void survey::load(string fileName)
             redshift = new photometric_redshift(z[i], zsig_min[i], zsig_max[i]);
         }
         if (ztype == DISTRIBUTION) {
-            redshift = new pdf_redshift(zsamp, pz[i]);
+            redshift = new pdf_redshift(zsamp[i], pz[i]);
         }
 
         shape_catalogue.push_back(std::make_pair(shape, redshift));
+    }
     }
 
     std::cout << "Successfully loaded " << shape_catalogue.size() << " galaxies." << std::endl;

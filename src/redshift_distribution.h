@@ -57,6 +57,12 @@ public:
 
   /*! Normalised redshift probability density function */
   virtual double pdf(double z) = 0;
+  
+  /*! Returns upper redshift bound */
+  virtual double get_zmax() = 0;
+  
+  /*! Returns lower redshift bound */
+  virtual double get_zmin() = 0;
 };
 
 
@@ -73,6 +79,10 @@ public:
   double get_redshift(){ return zSpec; }
   
   double pdf(double z){ return fabs(z - zSpec) <= EPSILON_SPECTRO ? 1.0 : 0.0; }
+  
+  double get_zmax(){ return zSpec; }
+  
+  double get_zmin(){ return zSpec; }
 };
 
 
@@ -98,6 +108,9 @@ public:
       return normalizationFactor * exp( - 0.5 * pow(z - zPhot, 2.0)/pow( z < zPhot ? zSigMin : zSigMax,2.0));
   }
   
+  double get_zmax(){ return zPhot + 6. * zSigMax; }
+  
+  double get_zmin(){ return std::max(zPhot - 6. * zSigMin, 0. ); }
 };
 
 
@@ -125,6 +138,10 @@ public:
   double pdf(double z){
       return normalizationFactor * pow(z, a) * exp( - pow(z/z0, b));
   }
+  
+  double get_zmin(){ return 0; }
+  
+  double get_zmax(){ return 5 * z0;}
 };
 
 
@@ -145,8 +162,15 @@ public:
   ~pdf_redshift();
   
   double pdf(double z){
-    return normalizationFactor*gsl_interp_eval(interpolator, x, y, z, accelerator);
+    if(z > x[nPoints - 1] || z < x[0])
+        return 0;
+    else
+        return normalizationFactor*gsl_interp_eval(interpolator, x, y, z, accelerator);
   }
+  
+  double get_zmin() {return x[0];}
+  
+  double get_zmax() {return x[nPoints - 1];}
 
 };
 

@@ -35,46 +35,128 @@
 #include <stdlib.h>
 #include <iostream>
 #include <fstream>
+#include <CCfits/CCfits>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/program_options.hpp>
-#include <sparse2d/IM_IO.h>
+#include <boost/algorithm/string.hpp>
 
+#include "version.h"
 #include "survey.h"
 #include "field.h"
 #include "surface_reconstruction.h"
+#include "density_reconstruction.h"
+#include "gpu_utils.h"
 
 
 namespace po = boost::program_options;
+using namespace std;
+using namespace CCfits;
 
 int main(int argc, char *argv[])
 {
-
     gsl_rng_env_setup();
     boost::property_tree::ptree pt;
+    
+    // List of GPU indices
+    std::vector<int> IDlist;
 
     // Read command line arguments
-    po::options_description desc("Allowed options");
-    desc.add_options()
+    po::options_description generic("Options");
+    generic.add_options()
+    ("version,v", "print version string")
+    ("help,h", "print help message")
+#ifdef CUDA_ACC
+    ("gpu,g", po::value< std::string >(), "comma separated list of GPUs to use (e.g: -g 0,1)")
+#endif
+    ;
+    
+    po::options_description positional("Arguments");
+    positional.add_options()
     ("config", po::value< std::string >()->required(), "configuration file")
     ("data",  po::value< std::string >()->required(), "survey data file")
-    ("output", po::value< std::string >()->required(), "output file");
-
+    ("output", po::value< std::string >()->required(), "output file name");
     po::positional_options_description positionalOptions;
     positionalOptions.add("config", 1);
     positionalOptions.add("data", 1);
     positionalOptions.add("output", 1);
+    
+    po::options_description cmdline_options;
+    cmdline_options.add(generic).add(positional);
+    
     po::variables_map vm;
 
+    // Process generic options
     try {
         po::store(po::command_line_parser(argc, argv)
-                  .options(desc)
+                  .options(generic)
+                  .run(), vm);
+        po::notify(vm);
+    } catch (po::error &e) {
+        std::cerr << "ERROR: " << e.what() << std::endl << std::endl;
+        std::cerr << cmdline_options << std::endl;
+        return 1;
+    }
+    if (vm.count("help")) {
+        cout << cmdline_options << "\n";
+        return 0;
+    }
+    
+    if (vm.count("version")) {
+         cout << VERSION << "\n";
+         return 0;
+    }
+    
+    // In case of GPU acceleration, parse the list of GPUs
+#ifdef CUDA_ACC
+    if (vm.count("gpu")) {
+        
+        // Check that none of the requested GPU id is larger than nGPU
+        int nGpu;
+        int whichGPUs[MAX_GPUS];
+        cudaGetDeviceCount(&nGpu);
+        
+        std::vector<std::string> strs;
+        boost::split(strs,vm["gpu"].as<std::string>(),boost::is_any_of(",;"));
+        
+        for(int i =0; i < strs.size(); i++){
+            IDlist.push_back(boost::lexical_cast<int>(strs[i]));
+        }
+        
+        if(IDlist.size() > MAX_GPUS){
+            cout << "ERROR: Requested more GPUs than maximum number;"<< endl;
+            cout << "Maximum size of GPU array " << MAX_GPUS << endl;
+            return -1;
+        }
+        if(IDlist.size() > nGpu){
+            cout << "ERROR: Requested more GPUs than available;"<< endl;
+            cout << "Number of GPUs available: " << nGpu << endl;
+            return -1;
+        }
+        
+        for(int i=0; i < IDlist.size(); i++){
+            
+            if(IDlist[i] >= nGpu){
+                cout << "ERROR: Requested GPU id not available;"<< endl;
+                cout << "Maximum GPU id : " << nGpu - 1 << endl;
+                return -1;
+            }
+            whichGPUs[i] = IDlist[i];
+        }
+        setWhichGPUs( IDlist.size(), whichGPUs);
+    }
+#endif
+    
+    // Process positional arguments
+    try {
+        po::store(po::command_line_parser(argc, argv)
+                  .options(cmdline_options)
                   .positional(positionalOptions)
                   .run(), vm);
         po::notify(vm);
     } catch (po::error &e) {
         std::cerr << "ERROR: " << e.what() << std::endl << std::endl;
-        std::cerr << desc << std::endl;
+        std::cerr << cmdline_options << std::endl;
         return 1;
     }
 
@@ -93,18 +175,84 @@ int main(int argc, char *argv[])
     // Initialize lensing field
     field *f = new field(pt, surv);
     
-    // Initialize reconstruction object
-    surface_reconstruction rec(pt, f);
     
-    rec.reconstruct();
+    // Open output fits file before performing the actual reconstruction
+    long naxes[3];
+    naxes[0] = f->get_npix();
+    naxes[1] = f->get_npix();
+    naxes[2] = f->get_nlp();
+    long naxis = naxes[2] == 1 ? 2 : 3; // Saving surface as 2d image, not 3d cube
     
-    // Extracts the reconstructed array
-    dblarray kappa(f->get_npix(),f->get_npix());
-    rec.get_convergence_map(kappa.buffer());
-    fits_write_dblarr(vm["output"].as<std::string>().c_str(), kappa);
+    std::auto_ptr<FITS> pFits(0);
+    try
+    {                
+        // overwrite existing file if the file already exists.
+        std::stringstream fileName;
+        fileName << "!" << vm["output"].as<std::string>();
+
+        pFits.reset( new FITS(fileName.str() , DOUBLE_IMG , naxis , naxes));
+    }
+    catch (FITS::CantCreate)
+    {
+        std::cerr << "ERROR: Cant create output FITS file" << std::endl;
+        return -1;       
+    }
     
+    // Array holding the reconstruction
+    double *reconstruction = (double *) malloc(sizeof(double)* f->get_npix() * f->get_npix() * f->get_nlp());
+
+    // If CUDA is available, give the option to reconstruct in 3D
+    if (f->get_nlp() > 1) {
+        density_reconstruction rec(pt, f);
+        rec.reconstruct();
+        
+        // Extracts the reconstructed array
+        rec.get_density_map(reconstruction);
+    } else {
+        // Initialize reconstruction object
+        surface_reconstruction rec(pt, f);
+
+        rec.reconstruct();
+
+        // Extracts the reconstructed array
+        rec.get_convergence_map(reconstruction);
+    }
+    
+    
+    // Number of elements in the array
+    long nelements =  naxes[0] * naxes[1] * naxes[2];
+    std::valarray<double> pixels(reconstruction, nelements);
+    long  fpixel(1);
+    
+    // Write primary array
+    pFits->pHDU().write(fpixel,nelements,pixels);
+
+    
+    std::vector<long> extAx(2, naxes[0]);
+    string raName ("RA");
+    ExtHDU* raExt = pFits->addImage(raName,DOUBLE_IMG,extAx);
+    
+    string decName ("DEC");
+    ExtHDU* decExt = pFits->addImage(decName,DOUBLE_IMG,extAx);
+    
+    
+    double *  ra  = (double *) malloc(sizeof(double) * naxes[0] * naxes[0]);
+    double *  dec = (double *) malloc(sizeof(double) * naxes[0] * naxes[0]);
+    
+    f->get_pixel_coordinates(ra, dec);
+    
+    long nExtElements = naxes[0] * naxes[0];
+    std::valarray<double> raVals(ra, nExtElements);
+    std::valarray<double> decVals(dec, nExtElements);
+    
+    raExt->write(fpixel, nExtElements, raVals);
+    decExt->write(fpixel, nExtElements, decVals);
+    
+    free(reconstruction);
+    free(ra);
+    free(dec);
     delete f;
     delete surv;
-    
+
     return 0;
 }
