@@ -99,12 +99,12 @@ int main(int argc, char *argv[])
     }
     if (vm.count("help")) {
         cout << cmdline_options << "\n";
-        return 1;
+        return 0;
     }
     
     if (vm.count("version")) {
          cout << VERSION << "\n";
-         return 1;
+         return 0;
     }
     
     // In case of GPU acceleration, parse the list of GPUs
