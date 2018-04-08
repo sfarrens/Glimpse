@@ -373,8 +373,7 @@ void density_reconstruction::run_main_iteration(long int niter, bool debias)
 #ifdef CUDA_ACC
         prox->prox_l1(alpha_tmp,1000);
 #else
-        // TODO: Check that this actually do what we want
-        analysis_prox(alpha_tmp);
+        // TODO: Implement CPU prox operator
 #endif
 
         // Fista update of the iterates
