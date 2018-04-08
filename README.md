@@ -22,7 +22,7 @@ These dependencies can easily be installed using a package manager:
 * Setting up requirements on **Linux**:
   Simply use the package manager provided by your Linux distribution, for instance on Ubuntu Linux:
   ```
-    $ sudo apt-get install cmake libgsl0-dev libfftw3-3  libccfits-dev libnfft3-dev
+    $ sudo apt-get install cmake libgsl0-dev libfftw3-3  libccfits-dev libnfft3-dev libarmadillo-dev libboost-all-dev
   ```
 * Setting up requirements on **MacOs X**:
   The preferred installation method for the dependencies is through [MacPorts](https://www.macports.org):
