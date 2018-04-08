@@ -135,14 +135,14 @@ density_reconstruction::density_reconstruction(boost::property_tree::ptree confi
     #ifdef CUDA_ACC
     prox = new spg(npix, nlp, nframes, f->get_preconditioning_matrix(), thresholds);
     #endif
-    
+
     // Normalization factor for the fft
     fftFactor     = 1.0 / (((double)npix) * npix);
 
     int dimensions[2] = { npix, npix };
     int rank = 2;
 
-    
+
 #ifdef CUDA_ACC
     // Retrieve which GPUs to use
     getDeviceCount(&nGPU);
@@ -181,7 +181,7 @@ density_reconstruction::density_reconstruction(boost::property_tree::ptree confi
                                        fft_frame, NULL, 1, npix*npix,
                                        FFTW_BACKWARD, FFTW_MEASURE);
 #endif
-    
+
 
     // Initialize the threshold levels, with lower thresholds on larger scales
     sigma_thr = (double *) malloc(sizeof(double) * nframes);
@@ -234,7 +234,7 @@ density_reconstruction::~density_reconstruction()
         cudaFree(d_frame);
     }
     cufftDestroy(fft_plan);
-    
+
     delete prox;
 #else
     fftwf_destroy_plan(plan_backward);
@@ -247,7 +247,7 @@ density_reconstruction::~density_reconstruction()
 
 void density_reconstruction::direct_fourier_transform(fftwf_complex *input, fftwf_complex *output)
 {
-    
+
 #ifdef CUDA_ACC
     if (nGPU > 1) {
         cufftXtMemcpy(fft_plan, d_frameXt, input, CUFFT_COPY_HOST_TO_DEVICE);
@@ -259,10 +259,10 @@ void density_reconstruction::direct_fourier_transform(fftwf_complex *input, fftw
         cudaMemcpy(output, d_frame, sizeof(cufftComplex)* npix * npix * nlp, cudaMemcpyDeviceToHost);
     }
 #else
-    
+
     #pragma omp parallel for
     for (long ind = 0; ind < ncoeff; ind++) {
-       fft_frame[ind][0] = input[ind][0]; fft_frame[ind][1] = input[ind][1]; 
+       fft_frame[ind][0] = input[ind][0]; fft_frame[ind][1] = input[ind][1];
     }
     fftwf_execute(plan_forward);
     #pragma omp parallel for
@@ -289,7 +289,7 @@ void density_reconstruction::inverse_fourier_transform(fftwf_complex *input, fft
 
     #pragma omp parallel for
     for (long ind = 0; ind < ncoeff; ind++) {
-        fft_frame[ind][0] = input[ind][0]; fft_frame[ind][1] = input[ind][1]; 
+        fft_frame[ind][0] = input[ind][0]; fft_frame[ind][1] = input[ind][1];
     }
     fftwf_execute(plan_backward);
     #pragma omp parallel for
@@ -302,7 +302,7 @@ void density_reconstruction::inverse_fourier_transform(fftwf_complex *input, fft
 
 void density_reconstruction::run_main_iteration(long int niter, bool debias)
 {
-    
+
 #ifdef DEBUG_FITS
     dblarray rec_delta(f->get_npix(), f->get_npix(), f->get_nlp());
     char name[256];
@@ -320,7 +320,7 @@ void density_reconstruction::run_main_iteration(long int niter, bool debias)
 
         // Compute adjoint of the wavelet transform
         wav->trans_adjoint(alpha_u, delta_u);
-        
+
         // Updating delta by a gradient step
             #pragma omp parallel for
             for (long ind = 0; ind < ncoeff; ind++) {
@@ -337,10 +337,10 @@ void density_reconstruction::run_main_iteration(long int niter, bool debias)
             }
 
 #ifdef CUDA_ACC
-            prox->prox_pos(alpha_tmp);            
+            prox->prox_pos(alpha_tmp);
 #else
 
-#endif  
+#endif
             #pragma omp parallel for
             for (long ind = 0; ind < ncoeff; ind++) {
                 delta_tmp[ind][0] = delta_tmp[ind][0] * fftFactor - alpha_tmp[ind];
@@ -356,23 +356,27 @@ void density_reconstruction::run_main_iteration(long int niter, bool debias)
         direct_fourier_transform(delta_tmp, delta_tmp);
         ///////////////////////////////////////////////////////
 
-        
+
         #pragma omp parallel for
         for (long ind = 0; ind < ncoeff; ind++) {
             delta_tmp_f[ind][0] = 2 * delta_tmp[ind][0] - delta[ind][0];
             delta_tmp_f[ind][1] = 2 * delta_tmp[ind][1] - delta[ind][1];
         }
-        
+
         wav->transform(delta_tmp_f, alpha_tmp);
-        
+
         #pragma omp parallel for
         for (long ind = 0; ind < nwavcoeff; ind++) {
           alpha_tmp[ind] = alpha_u[ind] + sig * alpha_tmp[ind];
         }
-        
+
+#ifdef CUDA_ACC
         prox->prox_l1(alpha_tmp,1000);
-        
-        
+#else
+        // TODO: Check that this actually do what we want
+        analysis_prox(alpha_tmp);
+#endif
+
         // Fista update of the iterates
         tk = 0.5 * (1.0 + sqrt(1.0 + 4.0 * old_tk * old_tk));
         // Updating delta
@@ -416,15 +420,15 @@ void density_reconstruction::analysis_prox(fftwf_complex *delta_in)
 
         // Compute gradient
         wav->trans_adjoint(alpha_prox, delta_tmp_f);
-        
+
         for (int z = 0; z < nlp; z++) {
             for (long ind = 0; ind < npix*npix ; ind++) {
                 delta_trans[z * npix * npix + ind][0] = 0;
                 delta_trans[z * npix * npix + ind][1] = 0;
-                
+
                 for (int z2 = 0; z2 < nlp; z2++) {
                     delta_trans[z * npix * npix + ind][0] += P[z * nlp + z2] * delta_tmp_f[z2 * npix * npix + ind][0];
-                    delta_trans[z * npix * npix + ind][1] += P[z * nlp + z2] * delta_tmp_f[z2 * npix * npix + ind][1];               
+                    delta_trans[z * npix * npix + ind][1] += P[z * nlp + z2] * delta_tmp_f[z2 * npix * npix + ind][1];
                 }
             }
         }
@@ -434,22 +438,22 @@ void density_reconstruction::analysis_prox(fftwf_complex *delta_in)
             delta_trans[ind][0] = delta_in[ind][0] / tau - delta_trans[ind][0];
             delta_trans[ind][1] = delta_in[ind][1] / tau - delta_trans[ind][1];
         }
-        
+
         for (int z = 0; z < nlp; z++) {
             for (long ind = 0; ind < npix*npix ; ind++) {
                 delta_tmp_f[z * npix * npix + ind][0] = 0;
                 delta_tmp_f[z * npix * npix + ind][1] = 0;
-                
+
                 for (int z2 = 0; z2 < nlp; z2++) {
                     delta_tmp_f[z * npix * npix + ind][0] += P[z * nlp + z2] * delta_trans[z2 * npix * npix + ind][0];
-                    delta_tmp_f[z * npix * npix + ind][1] += P[z * nlp + z2] * delta_trans[z2 * npix * npix + ind][1];               
+                    delta_tmp_f[z * npix * npix + ind][1] += P[z * nlp + z2] * delta_trans[z2 * npix * npix + ind][1];
                 }
             }
         }
-        
-        
+
+
         wav->transform(delta_tmp_f, alpha_grad);
-        
+
         // Compute BB update
         double ss=0;
         double sy=0;
@@ -465,16 +469,16 @@ void density_reconstruction::analysis_prox(fftwf_complex *delta_in)
             yy += y * y;
             sy += s * y;
         }
-        
+
         if(iter > 0){
             if(iter % 2)
                 tau_prox = -sy/yy;
-            else 
+            else
                 tau_prox = -ss/sy;
         }
         opt = 0;
         for (long ind = 0; ind < nwavcoeff; ind++) {
-            
+
             double dum = alpha_prox[ind];
             double w = weights[ind];
             double g = alpha_grad[ind];
@@ -490,7 +494,7 @@ void density_reconstruction::analysis_prox(fftwf_complex *delta_in)
             opt = o > opt ? o : opt;
             // Gradient descent
             dum = alpha_prox[ind] + tau_prox * alpha_grad[ind];
-            
+
             // Projection
             double val = dum - copysign(max(fabs(dum) - weights[ind], 0.0), dum);
             alpha_prox[ind] = val;
@@ -503,22 +507,22 @@ void density_reconstruction::analysis_prox(fftwf_complex *delta_in)
             std::cout << iter << " opt : " << opt << " ; tau : " << tau_prox <<std::endl;
             break;
         }
-        
+
     }
-    
+
     old_opt = opt0;
 
     // Return prox
     wav->trans_adjoint(alpha_prox, delta_tmp_f);
-    
+
     for (int z = 0; z < nlp; z++) {
         for (long ind = 0; ind < npix*npix ; ind++) {
             delta_trans[z * npix * npix + ind][0] = 0;
             delta_trans[z * npix * npix + ind][1] = 0;
-            
+
             for (int z2 = 0; z2 < nlp; z2++) {
                 delta_trans[z * npix * npix + ind][0] += P[z * nlp + z2] * delta_tmp_f[z2 * npix * npix + ind][0];
-                delta_trans[z * npix * npix + ind][1] += P[z * nlp + z2] * delta_tmp_f[z2 * npix * npix + ind][1];               
+                delta_trans[z * npix * npix + ind][1] += P[z * nlp + z2] * delta_tmp_f[z2 * npix * npix + ind][1];
             }
         }
     }
@@ -703,5 +707,3 @@ void density_reconstruction::get_density_map(double *d)
         }
     }
 }
-
-
