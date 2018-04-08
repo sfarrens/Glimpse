@@ -24,3 +24,4 @@ script:
     - mkdir build && cd build
     - cmake ..
     - make
+    - ./glimpse --version

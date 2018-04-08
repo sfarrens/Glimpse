@@ -85,7 +85,7 @@ set(GLIMPSE_SRC src/survey.cpp
 
 # VERSIONING from git
 execute_process(
-  COMMAND git describe
+  COMMAND git describe --tags
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
   OUTPUT_VARIABLE GIT_VERSION
   OUTPUT_STRIP_TRAILING_WHITESPACE
