@@ -5,6 +5,8 @@ Glimpse is a sparsity based mass-mapping algorithm. See the
 [Glimpse page](http://www.cosmostat.org/software/glimpse) on the
 CosmoStat website for more information.
 
+Note, the Glimpse version corresponding to [(Lanusse et al. 2016)](https://arxiv.org/abs/1603.01599) is [v1.0](https://github.com/CosmoStat/Glimpse/tree/v1.0)
+
 ## Installation
 
 ### Requirements
