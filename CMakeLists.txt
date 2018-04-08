@@ -1,9 +1,7 @@
 cmake_minimum_required(VERSION 3.0)
 
 # Paths to external libraries
-set(NICAEA_URL http://www.cosmostat.org/wp-content/uploads/2014/12/nicaea_2.5.tgz)
-set(NICAEA_MD5 27c4d6d46f234133fc69130e6460c2d4)
-
+set(NICAEA_URL https://github.com/EiffL/nicaea)
 set(SPARSE2D_URL https://github.com/CosmoStat/Sparse2D.git)
 
 # Adding customized cmake module
@@ -19,7 +17,7 @@ set(default_build_type "Release")
 if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
   set(default_build_type "Debug")
 endif()
- 
+
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   message(STATUS "Setting build type to '${default_build_type}' as none was specified.")
   set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE
@@ -42,9 +40,7 @@ find_package(Boost     COMPONENTS program_options REQUIRED)
 ## NICAEA
 ExternalProject_Add(NICAEA
         PREFIX NICAEA
-        URL ${NICAEA_URL}
-        URL_MD5 ${NICAEA_MD5}
-        PATCH_COMMAND patch -p1 < ${PROJECT_SOURCE_DIR}/nicaea.patch)
+        GIT_REPOSITORY ${NICAEA_URL})
         set(NICAEA_LIBRARY_DIR ${CMAKE_BINARY_DIR}/NICAEA/src/NICAEA/lib)
         set(NICAEA_INCLUDE_DIR ${CMAKE_BINARY_DIR}/NICAEA/src/NICAEA/include)
         set(NICAEA_LIBRARIES -lnicaea)
@@ -53,12 +49,12 @@ ExternalProject_Add(NICAEA
 ExternalProject_Add(SPARSE2D
          PREFIX SPARSE2D
          GIT_REPOSITORY ${SPARSE2D_URL}
-         GIT_TAG 22e24e0
+         GIT_TAG v2.1.0
          CMAKE_ARGS     -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/extern)
         set(SPARSE2D_LIBRARY_DIR ${CMAKE_BINARY_DIR}/extern/lib)
         set(SPARSE2D_INCLUDE_DIR ${CMAKE_BINARY_DIR}/extern/include)
-        set(SPARSE2D_LIBRARIES -lsparse2d)
-        
+        set(SPARSE2D_LIBRARIES -lsparse2d -ltools -lsparse1d)
+
 include_directories(${SPARSE2D_INCLUDE_DIR}
 		    ${GSL_INCLUDE_DIR}
 		    ${CCFITS_INCLUDE_DIR}
@@ -68,7 +64,7 @@ include_directories(${SPARSE2D_INCLUDE_DIR}
 		    ${NFFT_INCLUDE_DIR}
 		    ${FFTW_INCLUDE_DIR}
 		    ${ARMADILLO_INCLUDE_DIRS})
-		    
+
 link_directories(${SPARSE2D_LIBRARY_DIR}
 		    ${GSL_LIBRARY_DIR}
 		    ${CCFITS_LIBRARY_DIR}
@@ -86,7 +82,7 @@ set(GLIMPSE_SRC src/survey.cpp
 		src/starlet_2d.cpp
 		src/wavelet_transform.cpp
 		src/gpu_utils.c)
-		
+
 # VERSIONING from git
 execute_process(
   COMMAND git describe
@@ -110,7 +106,7 @@ if(${CUDA_FOUND})
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCUDA_ACC")
     set(CUDA_NVCC_FLAGS
     ${CUDA_NVCC_FLAGS};
-    -O3 -gencode arch=compute_52,code=sm_52 -gencode arch=compute_61,code=sm_61 
+    -O3 -gencode arch=compute_52,code=sm_52 -gencode arch=compute_61,code=sm_61
     )
 
     cuda_add_executable(glimpse src/glimpse.cpp ${GLIMPSE_SRC} src/spg.cu src/spg.cpp)
@@ -124,7 +120,7 @@ add_dependencies(glimpse NICAEA SPARSE2D)
 
 target_link_libraries(glimpse ${NICAEA_LIBRARIES}
                               ${SPARSE2D_LIBRARIES}
-                              ${Boost_LIBRARIES} 
+                              ${Boost_LIBRARIES}
                               ${GSL_LIBRARIES}
                               ${NFFT_LIBRARIES}
                               ${FFTW_LIBRARIES}
