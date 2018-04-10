@@ -6,6 +6,10 @@ cache:
       - /home/travis/build/CosmoStat/Glimpse/build/SPARSE2D
       - /home/travis/build/CosmoStat/Glimpse/build/NICAEA
 
+os:
+  - linux
+  - osx
+  
 # Compiler selection
 compiler:
     - gcc
@@ -18,8 +22,6 @@ install:
     - if [[ $TRAVIS_OS_NAME == "linux" ]]; then sudo apt-get install -qq cmake libgsl0-dev libfftw3-3 libccfits-dev libnfft3-dev libarmadillo-dev libboost-all-dev; fi
 
 #- sudo apt-get install -qq nvidia-cuda-dev
-
-install: true
 
 # Build steps
 script:
