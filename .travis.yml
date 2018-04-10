@@ -9,7 +9,7 @@ cache:
 os:
   - linux
   - osx
-  
+
 # Compiler selection
 compiler:
     - gcc
@@ -17,6 +17,7 @@ compiler:
 
 install:
     - if ! [[ $TRAVIS_OS_NAME == "linux" ]]; then brew cask uninstall oclint; fi
+    - if ! [[ $TRAVIS_OS_NAME == "linux" ]]; then brew update; fi
     - if ! [[ $TRAVIS_OS_NAME == "linux" ]]; then brew install gsl fftw nfft armadillo boost ccfits; fi
     - if [[ $TRAVIS_OS_NAME == "linux" ]]; then sudo apt-get update -qq; fi
     - if [[ $TRAVIS_OS_NAME == "linux" ]]; then sudo apt-get install -qq cmake libgsl0-dev libfftw3-3 libccfits-dev libnfft3-dev libarmadillo-dev libboost-all-dev; fi
