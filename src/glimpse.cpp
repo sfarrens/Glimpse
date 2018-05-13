@@ -218,7 +218,6 @@ int main(int argc, char *argv[])
         rec.get_convergence_map(reconstruction);
     }
     
-    
     // Number of elements in the array
     long nelements =  naxes[0] * naxes[1] * naxes[2];
     std::valarray<double> pixels(reconstruction, nelements);

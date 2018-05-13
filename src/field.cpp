@@ -40,6 +40,8 @@
 #include <gsl/gsl_integration.h>
 #include <gsl/gsl_interp.h>
 
+#include <omp.h>
+
 #ifdef DEBUG_FITS
 #include <sparse2d/IM_IO.h>
 #endif
@@ -842,6 +844,7 @@ void field::compute_3D_lensing_kernel()
     for (int i = 0; i < ngal; i++) {
         if(i % 100 == 0) std::cout  << "Processed " << i << "/" << ngal << " galaxies\r" << std::flush;
         redshift_distribution * redshift=surv->get_redshift(i);
+        
         
 	#pragma omp parallel for
         for(int z=0; z <nlp; z++){
