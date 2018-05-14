@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.0)
 
 # Paths to external libraries
-set(NICAEA_URL https://github.com/EiffL/nicaea)
+set(NICAEA_URL https://github.com/CosmoStat/nicaea)
 set(SPARSE2D_URL https://github.com/CosmoStat/Sparse2D.git)
 
 # Adding customized cmake module

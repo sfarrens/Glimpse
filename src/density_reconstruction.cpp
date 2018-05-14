@@ -186,7 +186,8 @@ density_reconstruction::density_reconstruction(boost::property_tree::ptree confi
     // Initialize the threshold levels, with lower thresholds on larger scales
     sigma_thr = (double *) malloc(sizeof(double) * nframes);
     for (int i = 0; i < nscales - 1; i++) {
-        sigma_thr[i] = lambda * sqrt(2 * log(npix / pow(2.0, i) * npix / pow(2.0, i))) / sqrt(2 * log(npix * npix));
+        sigma_thr[i] = lambda / pow(2.0,i); //lambda * sqrt(2 * log(npix / pow(2.0, i) * npix / pow(2.0, i))) / sqrt(2 * log(npix * npix));
+        std::cout << "Sigma threshold at scale" << i << " :" << sigma_thr[i] << std::endl;
     }
 
     // Special regularisation for the smooth approximation

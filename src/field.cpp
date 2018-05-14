@@ -39,6 +39,7 @@
 #include <string>
 #include <gsl/gsl_integration.h>
 #include <gsl/gsl_interp.h>
+#include <gsl/gsl_sf_trig.h>
 
 #include <omp.h>
 
@@ -349,7 +350,7 @@ void field::gradient_noise(fftwf_complex *delta)
 void field::forward_operator(fftwf_complex *delta)
 {
     double freqFactor = 2.0 * M_PI / pixel_size / ((double) npix);
-
+    double pixel_factor = pixel_size/(2.*M_PI);
     fftwf_complex *deltaFlex = delta + nlp * npix * npix;
 
     // First apply the kappa to gamma transform
@@ -357,6 +358,7 @@ void field::forward_operator(fftwf_complex *delta)
     for (int z = 0; z < nlp; z++) {
 
         double k1, k2, k1k1, k2k2, k1k2, ksqr;
+        double wp;
         double denom;
 
         // Compute residuals (1 - Ax)y - Bx
@@ -375,12 +377,15 @@ void field::forward_operator(fftwf_complex *delta)
                     continue;
                 }
 
+                // Compute pixel window
+                wp = gsl_sf_sinc(k1*pixel_factor)*gsl_sf_sinc(k2*pixel_factor);
+                
                 k1k1 = k1 * k1;
                 k2k2 = k2 * k2;
                 k1k2 = k1 * k2;
                 ksqr = k1k1 + k2k2;
 
-                denom = 1.0 / ksqr;
+                denom = 1.0 / ksqr ; /// wp;
                 ps[z]->f_hat[y * npix + x][0] = denom * (delta[pos][0] * (k2k2 - k1k1) + delta[pos][1] * (2.0 * k1k2));
                 ps[z]->f_hat[y * npix + x][1] = denom * (delta[pos][1] * (k2k2 - k1k1) - delta[pos][0] * (2.0 * k1k2));
             }
@@ -480,12 +485,14 @@ void field::adjoint_operator(fftwf_complex *delta, bool preconditionning)
 {
     double freqFactor = 2.0 * M_PI / pixel_size / ((double) npix);
 
+    double pixel_factor = pixel_size/(2.*M_PI);
     fftwf_complex *deltaFlex = delta + nlp * npix * npix;
 
     #pragma omp parallel for
     for (int z = 0; z < nlp; z++) {
         double k1, k2, k1k1, k2k2, k1k2, ksqr;
         double denom;
+        double wp;
 
         if(preconditionning){
             for (long i = 0; i < ngal ; i++) {
@@ -516,13 +523,16 @@ void field::adjoint_operator(fftwf_complex *delta, bool preconditionning)
                     continue;
                 }
 
+                // Compute pixel window
+                wp = gsl_sf_sinc(k1*pixel_factor)*gsl_sf_sinc(k2*pixel_factor);
+                
                 k1k1 = k1 * k1;
                 k2k2 = k2 * k2;
                 k1k2 = k1 * k2;
                 ksqr = k1k1 + k2k2;
 
-                delta[pos][0] = (ps[z]->f_hat[y * npix + x][0] * (k2k2 - k1k1) - ps[z]->f_hat[y * npix + x][1] * (2.0 * k1k2)) / ksqr;
-                delta[pos][1] = (ps[z]->f_hat[y * npix + x][1] * (k2k2 - k1k1) + ps[z]->f_hat[y * npix + x][0] * (2.0 * k1k2)) / ksqr;
+                delta[pos][0] = (ps[z]->f_hat[y * npix + x][0] * (k2k2 - k1k1) - ps[z]->f_hat[y * npix + x][1] * (2.0 * k1k2)) / ksqr ;///wp;
+                delta[pos][1] = (ps[z]->f_hat[y * npix + x][1] * (k2k2 - k1k1) + ps[z]->f_hat[y * npix + x][0] * (2.0 * k1k2)) / ksqr ; ///wp;
             }
         }
         delta[z * (npix * npix)][0] = 0;

@@ -119,20 +119,35 @@ surface_reconstruction::surface_reconstruction(boost::property_tree::ptree confi
     fft_frame     = fftwf_alloc_complex(ncoeff);
     plan_forward  = fftwf_plan_dft_2d(npix, npix, fft_frame, fft_frame, FFTW_FORWARD,  FFTW_MEASURE);
     plan_backward = fftwf_plan_dft_2d(npix, npix, fft_frame, fft_frame, FFTW_BACKWARD, FFTW_MEASURE);
-
+    
     // Initialize the threshold levels, with lower thresholds on larger scales
     sigma_thr = (double *) malloc(sizeof(double) * nframes);
     for (int i = 0; i < nscales - 1; i++) {
-        sigma_thr[i] = lambda * sqrt(2 * log(npix / pow(2.0, i) * npix / pow(2.0, i))) / sqrt(2 * log(npix * npix));
+        sigma_thr[i] = lambda / pow(2.0,i); //lambda * sqrt(2 * log(npix / pow(2.0, i) * npix / pow(2.0, i))) / sqrt(2 * log(npix * npix));
+        std::cout << "Sigma threshold at scale" << i << " :" << sigma_thr[i] << std::endl;
     }
 
     // Special regularisation for the smooth approximation
     sigma_thr[nscales - 1] = ls_reg;
 
     // Additional regularisation for additional BL frames
-    for (int i = nscales; i < nscales + 3; i++) {
+    for (int i = nscales; i < nframes; i++) {
         sigma_thr[i] = bl_reg;
     }
+
+//     // Initialize the threshold levels, with lower thresholds on larger scales
+//     sigma_thr = (double *) malloc(sizeof(double) * nframes);
+//     for (int i = 0; i < nscales - 1; i++) {
+//         sigma_thr[i] = lambda * sqrt(2 * log(npix / pow(2.0, i) * npix / pow(2.0, i))) / sqrt(2 * log(npix * npix));
+//     }
+// 
+//     // Special regularisation for the smooth approximation
+//     sigma_thr[nscales - 1] = ls_reg;
+// 
+//     // Additional regularisation for additional BL frames
+//     for (int i = nscales; i < nscales + 3; i++) {
+//         sigma_thr[i] = bl_reg;
+//     }
 
     mu1 = get_spectral_norm_prox(100, 1e-7);
     // mu2 = f->get_spectral_norm(200, 1e-7);
