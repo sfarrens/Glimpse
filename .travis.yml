@@ -1,21 +1,44 @@
 # Enable C++ support
 language: cpp
 
+matrix:
+  include:
+    - os: linux
+    - os: osx
+      osx_image: xcode10.1
+      env:
+        - MATRIX_EVAL="CC=gcc-7 && CXX=g++-7"
+
 cache:
     directories:
       - /home/travis/build/CosmoStat/Glimpse/build/SPARSE2D
       - /home/travis/build/CosmoStat/Glimpse/build/NICAEA
 
-# Compiler selection
-compiler:
-    - gcc
-
-sudo: required
+addons:
+  apt:
+    packages:
+      - cmake
+      - libgsl0-dev
+      - libfftw3-3
+      - libccfits-dev
+      - libnfft3-dev
+      - libarmadillo-dev
+      - libboost-all-dev
+  homebrew:
+    packages:
+      - gcc@7
+      - cmake
+      - pkgconfig
+      - gsl
+      - fftw
+      - brewsci/science/ccfits
+      - cfitsio
+      - brewsci/science/nfft
+      - armadillo
+      - boost
 
 before_install:
-    - sudo apt-get update -qq
-    - sudo apt-get install -qq cmake libgsl0-dev libfftw3-3  libccfits-dev libnfft3-dev libarmadillo-dev libboost-all-dev
-#- sudo apt-get install -qq nvidia-cuda-dev
+  - eval "${MATRIX_EVAL}"
 
 install: true
 
