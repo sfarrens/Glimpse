@@ -1,19 +1,6 @@
 # Enable C++ support
 language: cpp
 
-matrix:
-  include:
-    - os: linux
-    - os: osx
-      osx_image: xcode10.1
-      env:
-        - MATRIX_EVAL="CC=gcc-7 && CXX=g++-7"
-
-cache:
-    directories:
-      - /home/travis/build/CosmoStat/Glimpse/build/SPARSE2D
-      - /home/travis/build/CosmoStat/Glimpse/build/NICAEA
-
 addons:
   apt:
     packages:
@@ -25,8 +12,7 @@ addons:
       - libarmadillo-dev
       - libboost-all-dev
   homebrew:
-    packages:
-      - gcc@7
+    packages: &macos_packages
       - cmake
       - pkgconfig
       - gsl
@@ -36,6 +22,34 @@ addons:
       - brewsci/science/nfft
       - armadillo
       - boost
+
+matrix:
+  include:
+    - os: linux
+    - os: osx
+      osx_image: xcode10.1
+      env:
+        - MATRIX_EVAL="CC=gcc-7 && CXX=g++-7"
+      addons:
+        homebrew:
+          packages:
+            - gcc@7
+            - *macos_packages
+    - os: osx
+      osx_image: xcode10.1
+      env:
+        - MATRIX_EVAL="CC=/usr/local/opt/llvm/bin/clang && CXX=/usr/local/opt/llvm/bin/clang++"
+      addons:
+        homebrew:
+          packages:
+            - llvm
+            - libomp
+            - *macos_packages
+
+cache:
+    directories:
+      - /home/travis/build/CosmoStat/Glimpse/build/SPARSE2D
+      - /home/travis/build/CosmoStat/Glimpse/build/NICAEA
 
 before_install:
   - eval "${MATRIX_EVAL}"
