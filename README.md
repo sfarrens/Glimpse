@@ -13,6 +13,8 @@ Note, the Glimpse version corresponding to [(Lanusse et al. 2016)](https://arxiv
 
 Glimpse depends on the following software:
 
+* **Armadillo**
+* **Boost**
 * **FFTW** version 3.3 or later
 * **NFFT** version 3.2 or later
 * **cfitsio** and **CCFits**
