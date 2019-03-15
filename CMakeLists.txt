@@ -50,7 +50,7 @@ ExternalProject_Add(NICAEA
 ExternalProject_Add(SPARSE2D
          PREFIX SPARSE2D
          GIT_REPOSITORY ${SPARSE2D_URL}
-         GIT_TAG v2.1.0
+         GIT_TAG v2.1.2
          CMAKE_ARGS     -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/extern)
         set(SPARSE2D_LIBRARY_DIR ${CMAKE_BINARY_DIR}/extern/lib)
         set(SPARSE2D_INCLUDE_DIR ${CMAKE_BINARY_DIR}/extern/include)
